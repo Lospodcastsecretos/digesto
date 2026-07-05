@@ -419,7 +419,7 @@
                 <h3>Disponibilidad de Archivo</h3>
                 <select id="archivo-filter">
                     <option value="todos">Todos</option>
-                    <option value="con">Solo con archivo descargado</option>
+                    <option value="con">Solo con archivo disponible</option>
                     <option value="sin">Solo sin archivo</option>
                 </select>
             </div>
@@ -457,6 +457,7 @@
     <script>
         let originalData = [];
         let filteredData = [];
+        let mappedDrive = {}; // Mapeo de nombre de archivo -> ID de Google Drive
         let currentPage = 1;
         const itemsPerPage = 15;
 
@@ -475,10 +476,21 @@
         const btnNext = document.getElementById('btn-next');
         const pageIndicator = document.getElementById('page-indicator');
 
-        // 1. Obtener datos de la API local
+        // Cargar los archivos de mapeo de drive y los datos estaticos
         async function loadData() {
             try {
-                const response = await fetch('/api/datos');
+                // 1. Obtener la base de datos de mapeo de Google Drive
+                const mapResponse = await fetch('output/mapeo_drive.json');
+                if (mapResponse.ok) {
+                    mappedDrive = await mapResponse.json();
+                }
+            } catch (e) {
+                console.log("No se pudo cargar el mapeo de Drive local, usando enlaces por defecto.");
+            }
+
+            try {
+                // 2. Obtener datos estaticos de datos.json
+                const response = await fetch('./datos.json');
                 const data = await response.json();
                 originalData = data;
                 filteredData = [...originalData];
@@ -490,7 +502,7 @@
             }
         }
 
-        // 2. Llenar los filtros con valores unicos de forma dinamica
+        // Llenar filtros
         function populateFilters() {
             const tipos = new Set();
             const categorias = new Set();
@@ -504,7 +516,6 @@
                 }
             });
 
-            // Llenar tipo
             Array.from(tipos).sort().forEach(t => {
                 const option = document.createElement('option');
                 option.value = t;
@@ -512,7 +523,6 @@
                 tipoFilter.appendChild(option);
             });
 
-            // Llenar categoria
             Array.from(categorias).sort().forEach(c => {
                 const option = document.createElement('option');
                 option.value = c;
@@ -520,7 +530,6 @@
                 categoriaFilter.appendChild(option);
             });
 
-            // Llenar años ordenados de mas nuevo a mas viejo
             Array.from(anios).sort((a,b) => b - a).forEach(a => {
                 const option = document.createElement('option');
                 option.value = `Año ${a}`;
@@ -529,7 +538,7 @@
             });
         }
 
-        // 3. Filtrar los datos en base a todos los selectores activos
+        // Filtrar datos
         function filterData() {
             const query = searchBox.value.toLowerCase().trim();
             const selectedTipo = tipoFilter.value;
@@ -539,30 +548,21 @@
             const selectedVigencia = vigenciaFilter.value;
 
             filteredData = originalData.filter(item => {
-                // Filtro de texto
                 const matchesText = !query || 
                     (item.numero && item.numero.toLowerCase().includes(query)) ||
                     (item.titulo && item.titulo.toLowerCase().includes(query)) ||
                     (item.resumen && item.resumen.toLowerCase().includes(query)) ||
                     (item.descripcion && item.descripcion.toLowerCase().includes(query));
 
-                // Filtro de tipo
                 const matchesTipo = selectedTipo === 'todos' || item.tipo_nombre === selectedTipo;
-
-                // Filtro de categoria
                 const matchesCategoria = selectedCategoria === 'todas' || item.categoria_nombre === selectedCategoria;
-
-                // Filtro de Año
                 const matchesAnio = selectedAnio === 'todos' || item.fecha === selectedAnio;
 
-                // Filtro de Archivo Descargado
                 const hasFile = !!item.archivo_pdf;
                 const matchesArchivo = selectedArchivo === 'todos' || 
                     (selectedArchivo === 'con' && hasFile) || 
                     (selectedArchivo === 'sin' && !hasFile);
 
-                // Filtro de Vigencia
-                // vigencia puede ser bool o string en la API, mapeamos
                 const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
                 const matchesVigencia = selectedVigencia === 'todos' || 
                     (selectedVigencia === 'si' && esVigente) ||
@@ -575,7 +575,7 @@
             updateDashboard();
         }
 
-        // 4. Renderizar las tarjetas
+        // Renderizar tarjetas
         function renderCards() {
             cardsContainer.innerHTML = '';
             
@@ -592,11 +592,26 @@
                 const card = document.createElement('div');
                 card.className = 'card';
 
-                const hasFile = !!item.archivo_pdf;
-                const isPdf = hasFile && item.archivo_pdf.toLowerCase().endswith('.pdf');
-                const fileUrl = hasFile ? `/descargas/${item.archivo_pdf}` : '#';
-                
+                const filename = item.archivo_pdf;
+                const hasFile = !!filename;
                 const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
+
+                // Resolver enlace directo de descarga pública en Google Drive
+                let driveId = hasFile ? mappedDrive[filename] : null;
+                let fileUrl = '#';
+                let isPdf = false;
+                
+                if (hasFile) {
+                    if (driveId && !driveId.startsWith("sin_archivo") && !driveId.startsWith("error")) {
+                        // Enlace oficial de visualizacion de Google Drive
+                        fileUrl = `https://drive.google.com/file/d/${driveId}/view?usp=sharing`;
+                        isPdf = filename.toLowerCase().endswith('.pdf');
+                    } else {
+                        // Fallback a ruta local
+                        fileUrl = `/descargas/${filename}`;
+                        isPdf = filename.toLowerCase().endswith('.pdf');
+                    }
+                }
 
                 // Formatear descripcion
                 let desc = item.titulo || item.resumen || "Sin descripción disponible.";
@@ -604,13 +619,15 @@
                     desc = desc.substring(0, 250) + '...';
                 }
 
-                // Vista previa
+                // Vista previa embebida para PDFs u texto para docx/doc
                 let previewHtml = '';
                 if (hasFile) {
-                    if (isPdf) {
+                    if (isPdf && driveId) {
+                        // Usar el visor de Google Drive oficial embebido de forma publica
+                        const embedUrl = `https://docs.google.com/viewer?srcid=${driveId}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`;
                         previewHtml = `
                             <div class="preview-container" id="preview-${item.id}">
-                                <iframe class="preview-iframe" src="${fileUrl}" frameborder="0"></iframe>
+                                <iframe class="preview-iframe" src="${embedUrl}" frameborder="0"></iframe>
                             </div>`;
                     } else {
                         const fullText = item.resumen || item.titulo || "No hay texto disponible para vista previa.";
@@ -638,7 +655,7 @@
                                 Vista Previa
                             </button>
                             <a href="${fileUrl}" target="_blank" class="btn-download ${hasFile ? '' : 'disabled'}">
-                                Descargar
+                                Abrir Documento
                             </a>
                         </div>
                     </div>
@@ -656,7 +673,7 @@
             }
         };
 
-        // 5. Actualizar contadores y paginacion
+        // Actualizar contadores
         function updateDashboard() {
             renderCards();
 
@@ -670,7 +687,7 @@
             btnNext.disabled = currentPage === totalPages;
         }
 
-        // Listeners de eventos
+        // Listeners
         searchBox.addEventListener('input', filterData);
         tipoFilter.addEventListener('change', filterData);
         categoriaFilter.addEventListener('change', filterData);
@@ -695,7 +712,6 @@
             }
         });
 
-        // endswith pollyfill
         if (!String.prototype.endswith) {
             String.prototype.endswith = function(suffix) {
                 return this.indexOf(suffix, this.length - suffix.length) !== -1;
