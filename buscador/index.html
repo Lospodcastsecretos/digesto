@@ -253,47 +253,25 @@
             gap: 10px;
         }
 
-        .btn-download, .btn-preview {
+        .btn-preview {
             color: #fff;
             font-weight: 600;
-            text-decoration: none;
-            padding: 8px 16px;
+            padding: 8px 18px;
             border-radius: 8px;
             transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
             border: none;
             cursor: pointer;
             font-size: 0.85rem;
         }
 
-        .btn-download {
-            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
-        }
-
-        .btn-download:hover {
+        .btn-preview:hover {
             box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
             filter: brightness(1.1);
-        }
-
-        .btn-preview {
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-preview:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .btn-download.disabled, .btn-preview.disabled {
-            background: rgba(255, 255, 255, 0.05);
-            color: rgba(255, 255, 255, 0.2);
-            box-shadow: none;
-            border: none;
-            cursor: not-allowed;
-            pointer-events: none;
         }
 
         /* Vista Previa */
@@ -364,7 +342,7 @@
 
     <header>
         <h1>Digesto Alta Gracia</h1>
-        <div class="subtitle">Buscador Inteligente de Ordenanzas, Decretos y Resoluciones (Firebase Cloud Database)</div>
+        <div class="subtitle">Buscador Inteligente de Ordenanzas, Decretos y Resoluciones (Turso SQL Cloud)</div>
     </header>
 
     <main>
@@ -381,6 +359,9 @@
                 <h3>Tipo de Norma</h3>
                 <select id="tipo-filter">
                     <option value="todos">Todos los tipos</option>
+                    <option value="Ordenanza">Ordenanza</option>
+                    <option value="Decreto">Decreto</option>
+                    <option value="Resolución">Resolución</option>
                 </select>
             </div>
 
@@ -388,6 +369,14 @@
                 <h3>Categoría Temática</h3>
                 <select id="categoria-filter">
                     <option value="todas">Todas las categorías</option>
+                    <option value="Hacienda y Finanzas">Hacienda y Finanzas</option>
+                    <option value="Obras y Servicios Públicos">Obras y Servicios Públicos</option>
+                    <option value="Salud y Medio Ambiente">Salud y Medio Ambiente</option>
+                    <option value="Tránsito y Transporte">Tránsito y Transporte</option>
+                    <option value="Recursos Humanos / Personal">Recursos Humanos / Personal</option>
+                    <option value="Cultura, Deportes y Turismo">Cultura, Deportes y Turismo</option>
+                    <option value="Educación y Acción Social">Educación y Acción Social</option>
+                    <option value="Administración General">Administración General</option>
                 </select>
             </div>
 
@@ -395,15 +384,19 @@
                 <h3>Año de Sanción</h3>
                 <select id="anio-filter">
                     <option value="todos">Todos los años</option>
-                </select>
-            </div>
-
-            <div class="filter-group">
-                <h3>Disponibilidad de Archivo</h3>
-                <select id="archivo-filter">
-                    <option value="todos">Todos</option>
-                    <option value="con">Solo con archivo disponible</option>
-                    <option value="sin">Solo sin archivo</option>
+                    <!-- Años estaticos para acelerar carga inicial en API remota -->
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                    <option value="2021">2021</option>
+                    <option value="2020">2020</option>
+                    <option value="2019">2019</option>
+                    <option value="2018">2018</option>
+                    <option value="2017">2017</option>
+                    <option value="2016">2016</option>
+                    <option value="2015">2015</option>
                 </select>
             </div>
 
@@ -418,14 +411,13 @@
 
             <div class="stats">
                 <div>Normas encontradas: <span id="count-filtered">0</span></div>
-                <div>Total en base: <span id="count-total">0</span></div>
             </div>
         </aside>
 
         <!-- Resultados -->
         <section class="results-panel">
             <div id="cards-container">
-                <p style="text-align: center; color: var(--text-muted); padding: 40px;">Conectando a base de datos de Firebase...</p>
+                <p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando en base de datos de Turso...</p>
             </div>
 
             <!-- Controles de paginacion -->
@@ -438,11 +430,9 @@
     </main>
 
     <script>
-        let originalData = [];
-        let filteredData = [];
-        let mappedDrive = {};
         let currentPage = 1;
-        const itemsPerPage = 15;
+        let totalPages = 1;
+        let searchTimeout = null;
 
         // Elementos DOM
         const cardsContainer = document.getElementById('cards-container');
@@ -450,168 +440,66 @@
         const tipoFilter = document.getElementById('tipo-filter');
         const categoriaFilter = document.getElementById('categoria-filter');
         const anioFilter = document.getElementById('anio-filter');
-        const archivoFilter = document.getElementById('archivo-filter');
         const vigenciaFilter = document.getElementById('vigencia-filter');
         
         const countFiltered = document.getElementById('count-filtered');
-        const countTotal = document.getElementById('count-total');
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
         const pageIndicator = document.getElementById('page-indicator');
 
-        // URL publica de tu Firebase Realtime Database
-        const FIREBASE_DB_URL = "https://digestoag-cb08c-default-rtdb.firebaseio.com/normas.json";
+        // Hacer la consulta HTTP en tiempo real a la Serverless API de Vercel
+        async function fetchNormas() {
+            cardsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando normas...</p>';
+            
+            const query = searchBox.value.trim();
+            const tipo = tipoFilter.value;
+            const categoria = categoriaFilter.value;
+            const anio = anioFilter.value;
+            const vigencia = vigenciaFilter.value;
 
-        // Cargar los datos desde Firebase en tiempo real
-        async function loadData() {
+            // Construir URL de la API
+            let url = `/api/buscar?page=${currentPage}`;
+            if (query) url += `&query=${encodeURIComponent(query)}`;
+            if (tipo !== 'todos') url += `&tipo=${encodeURIComponent(tipo)}`;
+            if (categoria !== 'todas') url += `&categoria=${encodeURIComponent(categoria)}`;
+            if (anio !== 'todos') url += `&anio=${encodeURIComponent(anio)}`;
+            if (vigencia !== 'todos') url += `&vigencia=${encodeURIComponent(vigencia)}`;
+
             try {
-                // Obtener mapeo local para desarrollo offline / local
-                const mapResponse = await fetch('output/mapeo_drive.json');
-                if (mapResponse.ok) {
-                    mappedDrive = await mapResponse.json();
-                }
-            } catch (e) {
-                console.log("Mapeo de Drive local no disponible.");
-            }
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Error en la conexión a la API");
+                const data = await response.json();
 
-            try {
-                const response = await fetch(FIREBASE_DB_URL);
-                if (!response.ok) throw new Error("No se pudo obtener datos de Firebase.");
+                renderCards(data.normas);
                 
-                const dataObj = await response.json();
+                // Actualizar paginacion
+                totalPages = data.totalPages || 1;
+                countFiltered.textContent = data.total || 0;
+                pageIndicator.textContent = `Página ${currentPage} de ${totalPages}`;
                 
-                // Convertir el objeto indexado de Firebase de forma segura, filtrando nulos o vacios
-                let rawList = Object.values(dataObj || {});
-                originalData = rawList.filter(item => item !== null && typeof item === 'object');
-                
-                // Ordenar por ID de forma descendente de manera segura
-                originalData.sort((a, b) => {
-                    const idA = a.id || 0;
-                    const idB = b.id || 0;
-                    return idB - idA;
-                });
+                btnPrev.disabled = currentPage === 1;
+                btnNext.disabled = currentPage >= totalPages;
 
-                filteredData = [...originalData];
-                populateFilters();
-                updateDashboard();
             } catch (error) {
-                console.error("Error cargando los datos:", error);
-                cardsContainer.innerHTML = `
-                    <p style="color: #ef4444; text-align: center; padding: 40px; font-weight: 600;">
-                        Error al conectar con la base de datos de Firebase.<br>
-                        <span style="font-weight: 300; font-size: 0.9rem; color: var(--text-muted);">
-                            Verifique si configuró las Reglas del Realtime Database en modo de lectura pública (.read: true).
-                        </span>
-                    </p>`;
+                console.error("Error consultando la API de Turso:", error);
+                cardsContainer.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 40px;">Error al conectar con la base de datos de Turso Cloud.</p>';
             }
-        }
-
-        // Llenar filtros
-        function populateFilters() {
-            const tipos = new Set();
-            const categories = new Set();
-            const anios = new Set();
-
-            originalData.forEach(item => {
-                if (item.tipo_nombre) tipos.add(item.tipo_nombre);
-                if (item.categoria_nombre) categories.add(item.categoria_nombre);
-                if (item.fecha && item.fecha.startsWith("Año ")) {
-                    anios.add(item.fecha.replace("Año ", ""));
-                }
-            });
-
-            Array.from(tipos).sort().forEach(t => {
-                const option = document.createElement('option');
-                option.value = t;
-                option.textContent = t;
-                tipoFilter.appendChild(option);
-            });
-
-            Array.from(categories).sort().forEach(c => {
-                const option = document.createElement('option');
-                option.value = c;
-                option.textContent = c;
-                categoriaFilter.appendChild(option);
-            });
-
-            Array.from(anios).sort((a,b) => b - a).forEach(a => {
-                const option = document.createElement('option');
-                option.value = `Año ${a}`;
-                option.textContent = a;
-                anioFilter.appendChild(option);
-            });
-        }
-
-        // Filtrar datos
-        function filterData() {
-            const query = searchBox.value.toLowerCase().trim();
-            const selectedTipo = tipoFilter.value;
-            const selectedCategoria = categoriaFilter.value;
-            const selectedAnio = anioFilter.value;
-            const selectedArchivo = archivoFilter.value;
-            const selectedVigencia = vigenciaFilter.value;
-
-            filteredData = originalData.filter(item => {
-                const matchesText = !query || 
-                    (item.numero && String(item.numero).toLowerCase().includes(query)) ||
-                    (item.titulo && item.titulo.toLowerCase().includes(query)) ||
-                    (item.resumen && item.resumen.toLowerCase().includes(query));
-
-                const matchesTipo = selectedTipo === 'todos' || item.tipo_nombre === selectedTipo;
-                const matchesCategoria = selectedCategoria === 'todas' || item.categoria_nombre === selectedCategoria;
-                const matchesAnio = selectedAnio === 'todos' || item.fecha === selectedAnio;
-
-                const hasFile = !!item.archivo_pdf;
-                const matchesArchivo = selectedArchivo === 'todos' || 
-                    (selectedArchivo === 'con' && hasFile) || 
-                    (selectedArchivo === 'sin' && !hasFile);
-
-                const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
-                const matchesVigencia = selectedVigencia === 'todos' || 
-                    (selectedVigencia === 'si' && esVigente) ||
-                    (selectedVigencia === 'no' && !esVigente);
-
-                return matchesText && matchesTipo && matchesCategoria && matchesAnio && matchesArchivo && matchesVigencia;
-            });
-
-            currentPage = 1;
-            updateDashboard();
         }
 
         // Renderizar tarjetas
-        function renderCards() {
+        function renderCards(normas) {
             cardsContainer.innerHTML = '';
             
-            if (filteredData.length === 0) {
+            if (!normas || normas.length === 0) {
                 cardsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 60px;">No se encontraron normas con los criterios ingresados.</p>`;
                 return;
             }
 
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const pageItems = filteredData.slice(startIndex, endIndex);
-
-            pageItems.forEach(item => {
+            normas.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'card';
 
-                const filename = item.archivo_pdf;
-                const hasFile = !!filename;
-                const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
-
-                let driveId = hasFile ? mappedDrive[filename] : null;
-                let fileUrl = '#';
-                
-                // Mapear descarga local o proxy municipal
-                if (hasFile) {
-                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                        // Si estas en tu computadora local, busca el archivo descargado fisicamente
-                        fileUrl = `/descargas/${filename}`;
-                    } else if (driveId) {
-                        // En la web publica de Vercel, redirige al proxy directo de descarga del digesto oficial
-                        fileUrl = `https://digestoaltagracia.com.ar/download/${driveId}`;
-                    }
-                }
+                const esVigente = item.vigente === true;
 
                 // Formatear descripcion
                 let desc = item.titulo || item.resumen || "Sin descripción disponible.";
@@ -619,7 +507,6 @@
                     desc = desc.substring(0, 280) + '...';
                 }
 
-                // Vista previa textual completa
                 const fullText = item.resumen || item.titulo || "No hay texto disponible para vista previa.";
                 const previewHtml = `
                     <div class="preview-container" id="preview-${item.id}">
@@ -642,9 +529,6 @@
                             <button class="btn-preview" onclick="togglePreview(${item.id})">
                                 Vista Previa Texto
                             </button>
-                            <a href="${fileUrl}" target="_blank" class="btn-download ${hasFile ? '' : 'disabled'}">
-                                Descargar
-                            </a>
                         </div>
                     </div>
                     ${previewHtml}
@@ -661,29 +545,40 @@
             }
         };
 
-        // Actualizar contadores
-        function updateDashboard() {
-            renderCards();
-
-            countFiltered.textContent = filteredData.length;
-            countTotal.textContent = originalData.length;
-
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-            pageIndicator.textContent = `Página ${currentPage} de ${totalPages}`;
-
-            btnPrev.disabled = currentPage === 1;
-            btnNext.disabled = currentPage === totalPages;
+        // Debounce para evitar sobrecargar a Turso mientras el usuario escribe
+        function handleSearchInput() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                fetchNormas();
+            }, 300);
         }
 
         // Listeners
-        searchBox.addEventListener('input', filterData);
-        tipoFilter.addEventListener('change', filterData);
-        categoriaFilter.addEventListener('change', filterData);
-        anioFilter.addEventListener('change', filterData);
-        archivoFilter.addEventListener('change', filterData);
-        vigenciaFilter.addEventListener('change', filterData);
+        searchBox.addEventListener('input', handleSearchInput);
+        tipoFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
+        categoriaFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
+        anioFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
+        vigenciaFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
 
-        loadData();
+        btnPrev.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchNormas();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        btnNext.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchNormas();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        // Carga inicial
+        fetchNormas();
     </script>
 </body>
 </html>
