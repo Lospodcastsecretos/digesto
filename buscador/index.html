@@ -494,12 +494,12 @@
         // Llenar filtros
         function populateFilters() {
             const tipos = new Set();
-            const categorias = new Set();
+            const categories = new Set();
             const anios = new Set();
 
             originalData.forEach(item => {
                 if (item.tipo_nombre) tipos.add(item.tipo_nombre);
-                if (item.categoria_nombre) categorias.add(item.categoria_nombre);
+                if (item.categoria_nombre) categories.add(item.categoria_nombre);
                 if (item.fecha && item.fecha.startsWith("Año ")) {
                     anios.add(item.fecha.replace("Año ", ""));
                 }
@@ -512,7 +512,7 @@
                 tipoFilter.appendChild(option);
             });
 
-            Array.from(categorias).sort().forEach(c => {
+            Array.from(categories).sort().forEach(c => {
                 const option = document.createElement('option');
                 option.value = c;
                 option.textContent = c;
@@ -591,7 +591,9 @@
                 
                 if (hasFile) {
                     if (driveId && !driveId.startsWith("sin_archivo") && !driveId.startsWith("error")) {
-                        fileUrl = `https://drive.google.com/file/d/${driveId}/view?usp=sharing`;
+                        // IMPORTANTE: Redirigimos al proxy oficial del Digesto de Alta Gracia
+                        // para bypassear el molesto login forzoso de Google Drive
+                        fileUrl = `https://digestoaltagracia.com.ar/download/${driveId}`;
                         isPdf = filename.toLowerCase().endswith('.pdf');
                     } else {
                         fileUrl = `/descargas/${filename}`;
@@ -609,7 +611,9 @@
                 let previewHtml = '';
                 if (hasFile) {
                     if (isPdf && driveId) {
-                        const embedUrl = `https://docs.google.com/viewer?srcid=${driveId}&embedded=true`;
+                        // Embeber el visor de Google Docs apuntando al download directo del proxy municipal
+                        // Esto renderiza el PDF directamente y sin login de Google en la web
+                        const embedUrl = `https://docs.google.com/viewer?url=https://digestoaltagracia.com.ar/download/${driveId}&embedded=true`;
                         previewHtml = `
                             <div class="preview-container" id="preview-${item.id}">
                                 <iframe class="preview-iframe" src="${embedUrl}" frameborder="0"></iframe>
@@ -640,7 +644,7 @@
                                 Vista Previa
                             </button>
                             <a href="${fileUrl}" target="_blank" class="btn-download ${hasFile ? '' : 'disabled'}">
-                                Abrir Documento
+                                Descargar
                             </a>
                         </div>
                     </div>
