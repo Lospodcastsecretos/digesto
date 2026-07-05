@@ -591,9 +591,8 @@
                 
                 if (hasFile) {
                     if (driveId && !driveId.startsWith("sin_archivo") && !driveId.startsWith("error")) {
-                        // IMPORTANTE: Redirigimos al proxy oficial del Digesto de Alta Gracia
-                        // para bypassear el molesto login forzoso de Google Drive
-                        fileUrl = `https://digestoaltagracia.com.ar/download/${driveId}`;
+                        // Pasarela publica de Google Drive que NO requiere login del usuario
+                        fileUrl = `https://docs.google.com/viewer?url=https://docs.google.com/uc?export=download&id=${driveId}`;
                         isPdf = filename.toLowerCase().endswith('.pdf');
                     } else {
                         fileUrl = `/descargas/${filename}`;
@@ -611,9 +610,8 @@
                 let previewHtml = '';
                 if (hasFile) {
                     if (isPdf && driveId) {
-                        // Embeber el visor de Google Docs apuntando al download directo del proxy municipal
-                        // Esto renderiza el PDF directamente y sin login de Google en la web
-                        const embedUrl = `https://docs.google.com/viewer?url=https://digestoaltagracia.com.ar/download/${driveId}&embedded=true`;
+                        // Pasarela nativa embebida libre de credenciales
+                        const embedUrl = `https://docs.google.com/viewer?url=https://docs.google.com/uc?export=download&id=${driveId}&embedded=true`;
                         previewHtml = `
                             <div class="preview-container" id="preview-${item.id}">
                                 <iframe class="preview-iframe" src="${embedUrl}" frameborder="0"></iframe>
