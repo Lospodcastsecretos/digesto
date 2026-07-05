@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buscador Inteligente & Analíticas - Digesto Alta Gracia</title>
+    <title>Buscador Inteligente - Digesto Alta Gracia</title>
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,7 +42,7 @@
         header {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 40px 20px 10px 20px;
+            padding: 40px 20px 20px 20px;
             text-align: center;
         }
 
@@ -61,47 +61,7 @@
             color: var(--text-muted);
             font-size: 1.1rem;
             font-weight: 300;
-            margin-bottom: 25px;
-        }
-
-        /* Menu de Navegacion Premium */
-        .nav-tabs {
-            max-width: 1200px;
-            margin: 0 auto 30px auto;
-            padding: 0 20px;
-            display: flex;
-            gap: 15px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.1rem;
-            font-weight: 600;
-            padding: 12px 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-            border-bottom: 3px solid transparent;
-        }
-
-        .tab-btn:hover {
-            color: #fff;
-        }
-
-        .tab-btn.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .view-section {
-            display: none;
-        }
-
-        .view-section.active {
-            display: block;
+            margin-bottom: 30px;
         }
 
         main {
@@ -207,6 +167,7 @@
             padding: 25px;
             box-shadow: var(--glass-shadow);
             transition: border-color 0.25s ease;
+            position: relative;
         }
 
         .card:hover {
@@ -283,6 +244,10 @@
             font-size: 0.85rem;
         }
 
+        .doc-date {
+            color: var(--text-muted);
+        }
+
         .button-group {
             display: flex;
             gap: 10px;
@@ -306,6 +271,11 @@
         .btn-download {
             background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
             box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+        }
+
+        .btn-download:hover {
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+            filter: brightness(1.1);
         }
 
         .btn-preview {
@@ -332,6 +302,7 @@
             border-top: 1px dashed var(--border-color);
             padding-top: 20px;
             display: none;
+            transition: all 0.3s ease;
         }
 
         .preview-container.active {
@@ -354,78 +325,11 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 20px;
+            font-family: 'Inter', sans-serif;
             font-size: 0.95rem;
             line-height: 1.6;
             white-space: pre-wrap;
             color: #e5e7eb;
-        }
-
-        /* Seccion Estadisticas / Reporte */
-        .report-section {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px 60px 20px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        @media (max-width: 900px) {
-            .report-section {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .chart-box {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: var(--glass-shadow);
-            text-align: center;
-        }
-
-        .chart-box img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 12px;
-        }
-
-        .table-box {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: var(--glass-shadow);
-            overflow-x: auto;
-        }
-
-        .table-box h3 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.4rem;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95rem;
-            text-align: left;
-        }
-
-        th, td {
-            padding: 12px 15px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 0.05em;
         }
 
         /* Paginacion */
@@ -445,6 +349,7 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
+            transition: all 0.2s;
         }
 
         .btn-page:hover:not(:disabled) {
@@ -456,152 +361,89 @@
             opacity: 0.3;
             cursor: not-allowed;
         }
+
+        #page-indicator {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
 
     <header>
         <h1>Digesto Alta Gracia</h1>
-        <div class="subtitle">Buscador Inteligente & Consola de Analíticas Avanzadas</div>
+        <div class="subtitle">Buscador Inteligente de Ordenanzas, Decretos y Resoluciones</div>
     </header>
 
-    <!-- Pestañas de Navegacion -->
-    <nav class="nav-tabs">
-        <button id="tab-search" class="tab-btn active" onclick="switchTab('search')">Buscador de Normas</button>
-        <button id="tab-analytics" class="tab-btn" onclick="switchTab('analytics')">Reportes y Estadísticas</button>
-    </nav>
-
-    <!-- SECCION 1: BUSCADOR -->
-    <div id="section-search" class="view-section active">
-        <main>
-            <aside class="filters-panel">
-                <div class="filter-group">
-                    <h3>Búsqueda</h3>
-                    <div class="search-wrapper">
-                        <input type="text" id="search-box" class="search-input" placeholder="Escribe palabras clave, nro...">
-                    </div>
+    <main>
+        <!-- Panel lateral de filtros -->
+        <aside class="filters-panel">
+            <div class="filter-group">
+                <h3>Búsqueda</h3>
+                <div class="search-wrapper">
+                    <input type="text" id="search-box" class="search-input" placeholder="Escribe palabras clave, nro...">
                 </div>
-
-                <div class="filter-group">
-                    <h3>Tipo de Norma</h3>
-                    <select id="tipo-filter">
-                        <option value="todos">Todos los tipos</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <h3>Categoría Temática</h3>
-                    <select id="categoria-filter">
-                        <option value="todas">Todas las categorías</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <h3>Año de Sanción</h3>
-                    <select id="anio-filter">
-                        <option value="todos">Todos los años</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <h3>Disponibilidad de Archivo</h3>
-                    <select id="archivo-filter">
-                        <option value="todos">Todos</option>
-                        <option value="con">Solo con archivo disponible</option>
-                        <option value="sin">Solo sin archivo</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <h3>Vigencia de la Norma</h3>
-                    <select id="vigencia-filter">
-                        <option value="todos">Todos</option>
-                        <option value="si">Solo Vigentes</option>
-                        <option value="no">Solo No Vigentes / Históricos</option>
-                    </select>
-                </div>
-
-                <div class="stats">
-                    <div>Normas encontradas: <span id="count-filtered">0</span></div>
-                    <div>Total en base: <span id="count-total">0</span></div>
-                </div>
-            </aside>
-
-            <section class="results-panel">
-                <div id="cards-container"></div>
-                <div class="pagination">
-                    <button id="btn-prev" class="btn-page" disabled>Anterior</button>
-                    <span id="page-indicator">Página 1 de 1</span>
-                    <button id="btn-next" class="btn-page">Siguiente</button>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- SECCION 2: ANALYTICS -->
-    <div id="section-analytics" class="view-section">
-        <div class="report-section">
-            <!-- Box de Grafico -->
-            <div class="chart-box">
-                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; margin-bottom: 20px;">Distribución Temática General</h3>
-                <img src="./reporte_grafico.png" alt="Grafico de torta de categorias tematicas">
             </div>
 
-            <!-- Tabla de Tendencias -->
-            <div class="table-box">
-                <h3>Tendencias Legislativas Históricas</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Período</th>
-                            <th>Área Líder</th>
-                            <th>Normas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Años 90 (1990-1999)</td>
-                            <td>Hacienda y Finanzas</td>
-                            <td>135 sancionadas</td>
-                        </tr>
-                        <tr>
-                            <td>Años 2000 (2000-2009)</td>
-                            <td>Hacienda y Finanzas</td>
-                            <td>457 sancionadas</td>
-                        </tr>
-                        <tr>
-                            <td>Años 2010 (2010-2019)</td>
-                            <td>Hacienda y Finanzas</td>
-                            <td>442 sancionadas</td>
-                        </tr>
-                        <tr>
-                            <td>Años 2020 (2020-2026)</td>
-                            <td>Hacienda y Finanzas</td>
-                            <td>1313 sancionadas</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="filter-group">
+                <h3>Tipo de Norma</h3>
+                <select id="tipo-filter">
+                    <option value="todos">Todos los tipos</option>
+                </select>
             </div>
 
-            <!-- Tabla de Auditoria de Normas Criticas -->
-            <div class="table-box" style="grid-column: span 2;">
-                <h3>Alertas de Auditoría (Loteos, Expropiaciones y Excepciones Recientes)</h3>
-                <table style="font-size: 0.9rem;">
-                    <thead>
-                        <tr>
-                            <th>N° Norma</th>
-                            <th>Tipo</th>
-                            <th>Alerta / Temática Crítica</th>
-                            <th>Título / Detalle</th>
-                        </tr>
-                    </thead>
-                    <tbody id="auditoria-table-body">
-                        <!-- Inyectado dinamicamente -->
-                    </tbody>
-                </table>
+            <div class="filter-group">
+                <h3>Categoría Temática</h3>
+                <select id="categoria-filter">
+                    <option value="todas">Todas las categorías</option>
+                </select>
             </div>
-        </div>
-    </div>
+
+            <div class="filter-group">
+                <h3>Año de Sanción</h3>
+                <select id="anio-filter">
+                    <option value="todos">Todos los años</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Disponibilidad de Archivo</h3>
+                <select id="archivo-filter">
+                    <option value="todos">Todos</option>
+                    <option value="con">Solo con archivo disponible</option>
+                    <option value="sin">Solo sin archivo</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Vigencia de la Norma</h3>
+                <select id="vigencia-filter">
+                    <option value="todos">Todos</option>
+                    <option value="si">Solo Vigentes</option>
+                    <option value="no">Solo No Vigentes / Históricos</option>
+                </select>
+            </div>
+
+            <div class="stats">
+                <div>Normas encontradas: <span id="count-filtered">0</span></div>
+                <div>Total en base: <span id="count-total">0</span></div>
+            </div>
+        </aside>
+
+        <!-- Resultados -->
+        <section class="results-panel">
+            <div id="cards-container">
+                <!-- Se inyecta dinamicamente con JS -->
+            </div>
+
+            <!-- Controles de paginacion -->
+            <div class="pagination">
+                <button id="btn-prev" class="btn-page" disabled>Anterior</button>
+                <span id="page-indicator">Página 1 de 1</span>
+                <button id="btn-next" class="btn-page">Siguiente</button>
+            </div>
+        </section>
+    </main>
 
     <script>
         let originalData = [];
@@ -618,28 +460,14 @@
         const anioFilter = document.getElementById('anio-filter');
         const archivoFilter = document.getElementById('archivo-filter');
         const vigenciaFilter = document.getElementById('vigencia-filter');
+        
         const countFiltered = document.getElementById('count-filtered');
         const countTotal = document.getElementById('count-total');
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
         const pageIndicator = document.getElementById('page-indicator');
-        const auditoriaTableBody = document.getElementById('auditoria-table-body');
 
-        // Alternar pestañas
-        window.switchTab = function(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
-
-            if (tabName === 'search') {
-                document.getElementById('tab-search').classList.add('active');
-                document.getElementById('section-search').classList.add('active');
-            } else {
-                document.getElementById('tab-analytics').classList.add('active');
-                document.getElementById('section-analytics').classList.add('active');
-            }
-        };
-
-        // Cargar datos
+        // Cargar los archivos de mapeo de drive y los datos estaticos
         async function loadData() {
             try {
                 const mapResponse = await fetch('output/mapeo_drive.json');
@@ -657,7 +485,6 @@
                 filteredData = [...originalData];
                 populateFilters();
                 updateDashboard();
-                populateAuditoria();
             } catch (error) {
                 console.error("Error cargando los datos:", error);
                 cardsContainer.innerHTML = `<p style="color: #ef4444; text-align: center; padding: 40px;">Error al cargar la base de datos.</p>`;
@@ -697,42 +524,6 @@
                 option.value = `Año ${a}`;
                 option.textContent = a;
                 anioFilter.appendChild(option);
-            });
-        }
-
-        // Poblar tabla de auditoria con alertas reales
-        function populateAuditoria() {
-            auditoriaTableBody.innerHTML = '';
-            
-            // Buscar palabras criticas
-            const criticasKeywords = {
-                "expropiacion": "Expropiación de tierras",
-                "donacion": "Donación de terrenos/fondos",
-                "excepcion": "Excepción de código urbano",
-                "loteo": "Aprobación de loteo especial"
-            };
-
-            const criticos = [];
-            originalData.forEach(item => {
-                const texto = `${item.titulo} ${item.resumen}`.toLowerCase();
-                for (const [kw, label] of Object.entries(criticasKeywords)) {
-                    if (texto.includes(kw)) {
-                        criticos.push({ item, label });
-                        break;
-                    }
-                }
-            });
-
-            // Mostrar los primeros 15 criticos
-            criticos.slice(0, 15).forEach(c => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${c.item.numero || 'S/N'}</strong></td>
-                    <td>${c.item.tipo_nombre || 'Ordenanza'}</td>
-                    <td><span style="color: #f59e0b; font-weight: 600;">${c.label}</span></td>
-                    <td>${c.item.titulo || c.item.resumen.substring(0, 80)}</td>
-                `;
-                auditoriaTableBody.appendChild(tr);
             });
         }
 
@@ -808,11 +599,13 @@
                     }
                 }
 
+                // Formatear descripcion
                 let desc = item.titulo || item.resumen || "Sin descripción disponible.";
                 if (desc.length > 250) {
                     desc = desc.substring(0, 250) + '...';
                 }
 
+                // Vista previa embebida para PDFs u texto para docx/doc
                 let previewHtml = '';
                 if (hasFile) {
                     if (isPdf && driveId) {
@@ -857,14 +650,15 @@
             });
         }
 
+        // Alternar vista previa
         window.togglePreview = function(id) {
             const preview = document.getElementById(`preview-${id}`);
             if (preview) {
-                const isActive = preview.style.display === 'block';
-                preview.style.display = isActive ? 'none' : 'block';
+                preview.classList.toggle('active');
             }
         };
 
+        // Actualizar contadores
         function updateDashboard() {
             renderCards();
 
@@ -878,6 +672,7 @@
             btnNext.disabled = currentPage === totalPages;
         }
 
+        // Listeners
         searchBox.addEventListener('input', filterData);
         tipoFilter.addEventListener('change', filterData);
         categoriaFilter.addEventListener('change', filterData);
