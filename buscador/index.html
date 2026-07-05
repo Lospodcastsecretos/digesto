@@ -437,11 +437,16 @@
                 
                 const dataObj = await response.json();
                 
-                // Convertir el objeto indexado de Firebase de vuelta en una lista
-                originalData = Object.values(dataObj || {});
+                // Convertir el objeto indexado de Firebase de forma segura, filtrando nulos o vacios
+                let rawList = Object.values(dataObj || {});
+                originalData = rawList.filter(item => item !== null && typeof item === 'object');
                 
-                // Ordenar por ID o numero de forma descendente por defecto
-                originalData.sort((a, b) => (b.id || 0) - (a.id || 0));
+                // Ordenar por ID de forma descendente de manera segura
+                originalData.sort((a, b) => {
+                    const idA = a.id || 0;
+                    const idB = b.id || 0;
+                    return idB - idA;
+                });
 
                 filteredData = [...originalData];
                 populateFilters();
