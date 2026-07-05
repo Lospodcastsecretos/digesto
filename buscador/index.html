@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador Inteligente - Digesto Alta Gracia</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --accent: #06b6d4;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%);
+        }
+
+        header {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px 20px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #fff 30%, var(--primary) 70%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            font-weight: 300;
+            margin-bottom: 30px;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 60px 20px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Lateral de Filtros */
+        .filters-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 25px;
+            height: fit-content;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .filter-group {
+            margin-bottom: 22px;
+        }
+
+        .filter-group h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            border-left: 3px solid var(--primary);
+            padding-left: 8px;
+        }
+
+        .search-wrapper {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(10, 15, 30, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 20px;
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+        }
+
+        select {
+            width: 100%;
+            background: rgba(10, 15, 30, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 15px;
+            color: #fff;
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        .stats {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .stats span {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* Panel de Resultados */
+        .results-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 25px;
+            box-shadow: var(--glass-shadow);
+            transition: border-color 0.25s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .doc-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-tipo {
+            background: rgba(139, 92, 246, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .badge-categoria {
+            background: rgba(6, 182, 212, 0.15);
+            color: #22d3ee;
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .badge-vigente {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-novigente {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .doc-description {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+            font-size: 0.85rem;
+        }
+
+        .doc-date {
+            color: var(--text-muted);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-download, .btn-preview {
+            color: #fff;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+        }
+
+        .btn-download:hover {
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-preview {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-preview:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-download.disabled, .btn-preview.disabled {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.2);
+            box-shadow: none;
+            border: none;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Contenedor de Vista Previa Desplegable */
+        .preview-container {
+            margin-top: 20px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 20px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .preview-container.active {
+            display: block;
+        }
+
+        .preview-iframe {
+            width: 100%;
+            height: 500px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .preview-text {
+            width: 100%;
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(10, 15, 30, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #e5e7eb;
+        }
+
+        /* Paginacion */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 40px;
+        }
+
+        .btn-page {
+            background: var(--card-bg);
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-page:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-page:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        #page-indicator {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Digesto Alta Gracia</h1>
+        <div class="subtitle">Buscador Inteligente de Ordenanzas, Decretos y Resoluciones</div>
+    </header>
+
+    <main>
+        <!-- Panel lateral de filtros -->
+        <aside class="filters-panel">
+            <div class="filter-group">
+                <h3>Búsqueda</h3>
+                <div class="search-wrapper">
+                    <input type="text" id="search-box" class="search-input" placeholder="Escribe palabras clave, nro...">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <h3>Tipo de Norma</h3>
+                <select id="tipo-filter">
+                    <option value="todos">Todos los tipos</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Categoría Temática</h3>
+                <select id="categoria-filter">
+                    <option value="todas">Todas las categorías</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Año de Sanción</h3>
+                <select id="anio-filter">
+                    <option value="todos">Todos los años</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Disponibilidad de Archivo</h3>
+                <select id="archivo-filter">
+                    <option value="todos">Todos</option>
+                    <option value="con">Solo con archivo descargado</option>
+                    <option value="sin">Solo sin archivo</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <h3>Vigencia de la Norma</h3>
+                <select id="vigencia-filter">
+                    <option value="todos">Todos</option>
+                    <option value="si">Solo Vigentes</option>
+                    <option value="no">Solo No Vigentes / Históricos</option>
+                </select>
+            </div>
+
+            <div class="stats">
+                <div>Normas encontradas: <span id="count-filtered">0</span></div>
+                <div>Total en base: <span id="count-total">0</span></div>
+            </div>
+        </aside>
+
+        <!-- Resultados -->
+        <section class="results-panel">
+            <div id="cards-container">
+                <!-- Se inyecta dinamicamente con JS -->
+            </div>
+
+            <!-- Controles de paginacion -->
+            <div class="pagination">
+                <button id="btn-prev" class="btn-page" disabled>Anterior</button>
+                <span id="page-indicator">Página 1 de 1</span>
+                <button id="btn-next" class="btn-page">Siguiente</button>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let originalData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const itemsPerPage = 15;
+
+        // Elementos DOM
+        const cardsContainer = document.getElementById('cards-container');
+        const searchBox = document.getElementById('search-box');
+        const tipoFilter = document.getElementById('tipo-filter');
+        const categoriaFilter = document.getElementById('categoria-filter');
+        const anioFilter = document.getElementById('anio-filter');
+        const archivoFilter = document.getElementById('archivo-filter');
+        const vigenciaFilter = document.getElementById('vigencia-filter');
+        
+        const countFiltered = document.getElementById('count-filtered');
+        const countTotal = document.getElementById('count-total');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const pageIndicator = document.getElementById('page-indicator');
+
+        // 1. Obtener datos de la API local
+        async function loadData() {
+            try {
+                const response = await fetch('/api/datos');
+                const data = await response.json();
+                originalData = data;
+                filteredData = [...originalData];
+                populateFilters();
+                updateDashboard();
+            } catch (error) {
+                console.error("Error cargando los datos:", error);
+                cardsContainer.innerHTML = `<p style="color: #ef4444; text-align: center; padding: 40px;">Error al cargar la base de datos.</p>`;
+            }
+        }
+
+        // 2. Llenar los filtros con valores unicos de forma dinamica
+        function populateFilters() {
+            const tipos = new Set();
+            const categorias = new Set();
+            const anios = new Set();
+
+            originalData.forEach(item => {
+                if (item.tipo_nombre) tipos.add(item.tipo_nombre);
+                if (item.categoria_nombre) categorias.add(item.categoria_nombre);
+                if (item.fecha && item.fecha.startsWith("Año ")) {
+                    anios.add(item.fecha.replace("Año ", ""));
+                }
+            });
+
+            // Llenar tipo
+            Array.from(tipos).sort().forEach(t => {
+                const option = document.createElement('option');
+                option.value = t;
+                option.textContent = t;
+                tipoFilter.appendChild(option);
+            });
+
+            // Llenar categoria
+            Array.from(categorias).sort().forEach(c => {
+                const option = document.createElement('option');
+                option.value = c;
+                option.textContent = c;
+                categoriaFilter.appendChild(option);
+            });
+
+            // Llenar años ordenados de mas nuevo a mas viejo
+            Array.from(anios).sort((a,b) => b - a).forEach(a => {
+                const option = document.createElement('option');
+                option.value = `Año ${a}`;
+                option.textContent = a;
+                anioFilter.appendChild(option);
+            });
+        }
+
+        // 3. Filtrar los datos en base a todos los selectores activos
+        function filterData() {
+            const query = searchBox.value.toLowerCase().trim();
+            const selectedTipo = tipoFilter.value;
+            const selectedCategoria = categoriaFilter.value;
+            const selectedAnio = anioFilter.value;
+            const selectedArchivo = archivoFilter.value;
+            const selectedVigencia = vigenciaFilter.value;
+
+            filteredData = originalData.filter(item => {
+                // Filtro de texto
+                const matchesText = !query || 
+                    (item.numero && item.numero.toLowerCase().includes(query)) ||
+                    (item.titulo && item.titulo.toLowerCase().includes(query)) ||
+                    (item.resumen && item.resumen.toLowerCase().includes(query)) ||
+                    (item.descripcion && item.descripcion.toLowerCase().includes(query));
+
+                // Filtro de tipo
+                const matchesTipo = selectedTipo === 'todos' || item.tipo_nombre === selectedTipo;
+
+                // Filtro de categoria
+                const matchesCategoria = selectedCategoria === 'todas' || item.categoria_nombre === selectedCategoria;
+
+                // Filtro de Año
+                const matchesAnio = selectedAnio === 'todos' || item.fecha === selectedAnio;
+
+                // Filtro de Archivo Descargado
+                const hasFile = !!item.archivo_pdf;
+                const matchesArchivo = selectedArchivo === 'todos' || 
+                    (selectedArchivo === 'con' && hasFile) || 
+                    (selectedArchivo === 'sin' && !hasFile);
+
+                // Filtro de Vigencia
+                // vigencia puede ser bool o string en la API, mapeamos
+                const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
+                const matchesVigencia = selectedVigencia === 'todos' || 
+                    (selectedVigencia === 'si' && esVigente) ||
+                    (selectedVigencia === 'no' && !esVigente);
+
+                return matchesText && matchesTipo && matchesCategoria && matchesAnio && matchesArchivo && matchesVigencia;
+            });
+
+            currentPage = 1;
+            updateDashboard();
+        }
+
+        // 4. Renderizar las tarjetas
+        function renderCards() {
+            cardsContainer.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                cardsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 60px;">No se encontraron normas con los criterios ingresados.</p>`;
+                return;
+            }
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageItems = filteredData.slice(startIndex, endIndex);
+
+            pageItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                const hasFile = !!item.archivo_pdf;
+                const isPdf = hasFile && item.archivo_pdf.toLowerCase().endswith('.pdf');
+                const fileUrl = hasFile ? `/descargas/${item.archivo_pdf}` : '#';
+                
+                const esVigente = item.vigente === true || String(item.vigente).toLowerCase() === 'vigente';
+
+                // Formatear descripcion
+                let desc = item.titulo || item.resumen || "Sin descripción disponible.";
+                if (desc.length > 250) {
+                    desc = desc.substring(0, 250) + '...';
+                }
+
+                // Vista previa
+                let previewHtml = '';
+                if (hasFile) {
+                    if (isPdf) {
+                        previewHtml = `
+                            <div class="preview-container" id="preview-${item.id}">
+                                <iframe class="preview-iframe" src="${fileUrl}" frameborder="0"></iframe>
+                            </div>`;
+                    } else {
+                        const fullText = item.resumen || item.titulo || "No hay texto disponible para vista previa.";
+                        previewHtml = `
+                            <div class="preview-container" id="preview-${item.id}">
+                                <div class="preview-text">${fullText}</div>
+                            </div>`;
+                    }
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="doc-title">${item.tipo_nombre || 'Norma'} N° ${item.numero || 'S/N'}</div>
+                        <div class="badge-container">
+                            <span class="badge badge-tipo">${item.tipo_nombre || 'Desconocido'}</span>
+                            <span class="badge badge-categoria">${item.categoria_nombre || 'General'}</span>
+                            <span class="badge ${esVigente ? 'badge-vigente' : 'badge-novigente'}">${esVigente ? 'Vigente' : 'Histórico'}</span>
+                        </div>
+                    </div>
+                    <div class="doc-description">${desc}</div>
+                    <div class="card-footer">
+                        <div class="doc-date">Fecha: ${item.fecha || 'Sin fecha'}</div>
+                        <div class="button-group">
+                            <button class="btn-preview ${hasFile ? '' : 'disabled'}" onclick="togglePreview(${item.id})">
+                                Vista Previa
+                            </button>
+                            <a href="${fileUrl}" target="_blank" class="btn-download ${hasFile ? '' : 'disabled'}">
+                                Descargar
+                            </a>
+                        </div>
+                    </div>
+                    ${previewHtml}
+                `;
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        // Alternar vista previa
+        window.togglePreview = function(id) {
+            const preview = document.getElementById(`preview-${id}`);
+            if (preview) {
+                preview.classList.toggle('active');
+            }
+        };
+
+        // 5. Actualizar contadores y paginacion
+        function updateDashboard() {
+            renderCards();
+
+            countFiltered.textContent = filteredData.length;
+            countTotal.textContent = originalData.length;
+
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+            pageIndicator.textContent = `Página ${currentPage} de ${totalPages}`;
+
+            btnPrev.disabled = currentPage === 1;
+            btnNext.disabled = currentPage === totalPages;
+        }
+
+        // Listeners de eventos
+        searchBox.addEventListener('input', filterData);
+        tipoFilter.addEventListener('change', filterData);
+        categoriaFilter.addEventListener('change', filterData);
+        anioFilter.addEventListener('change', filterData);
+        archivoFilter.addEventListener('change', filterData);
+        vigenciaFilter.addEventListener('change', filterData);
+
+        btnPrev.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        btnNext.addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                updateDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        // endswith pollyfill
+        if (!String.prototype.endswith) {
+            String.prototype.endswith = function(suffix) {
+                return this.indexOf(suffix, this.length - suffix.length) !== -1;
+            };
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
