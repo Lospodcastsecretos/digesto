@@ -1,5 +1,3 @@
-import { createClient } from '@libsql/client';
-
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -15,15 +13,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Obtener variables de entorno
-  const url = process.env.TURSO_URL || "https://digesto-lospodcastsecretos.aws-us-west-2.turso.io";
-  const authToken = process.env.TURSO_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODMyODgxMjQsImlkIjoiMDE5ZjM0NDAtN2UwMS03OTljLWFlOTItODBiMDJmNmVhMjdlIiwia2lkIjoiZ0JFblIyNVR6dEEwaHVWWXljOS03cnRzYThUaGRnbmFEd1ZHSXJrR3FPYyIsInJpZCI6ImE1MGUwMDBmLTQ4ZTgtNDg1ZS04MmM0LTEzNGIxYTA4MmJhYSJ9.ev1b_OISV20t8e9brtO7O4oU9bGnrPYum1LTbBiVng-gaPC2YiUsHzFe-ok2aXmVePtRNYtAmKpb0ntWL6xSCA";
-
-  // Inicializar cliente estable de Turso compatible con Vercel Serverless
-  const client = createClient({
-    url: url,
-    authToken: authToken,
-  });
+  // Configuración de conexión de Turso
+  const TURSO_URL = process.env.TURSO_URL || "https://digesto-lospodcastsecretos.aws-us-west-2.turso.io";
+  const TURSO_TOKEN = process.env.TURSO_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODMyODgxMjQsImlkIjoiMDE5ZjM0NDAtN2UwMS03OTljLWFlOTItODBiMDJmNmVhMjdlIiwia2lkIjoiZ0JFblIyNVR6dEEwaHVWWXljOS03cnRzYThUaGRnbmFEd1ZHSXJrR3FPYyIsInJpZCI6ImE1MGUwMDBmLTQ4ZTgtNDg1ZS04MmM0LTEzNGIxYTA4MmJhYSJ9.ev1b_OISV20t8e9brtO7O4oU9bGnrPYum1LTbBiVng-gaPC2YiUsHzFe-ok2aXmVePtRNYtAmKpb0ntWL6xSCA";
 
   // Capturar parámetros
   const { query, tipo, categoria, anio, vigencia, page } = req.query;
@@ -32,70 +24,109 @@ export default async function handler(req, res) {
   const currentPage = parseInt(page) || 1;
   const offset = (currentPage - 1) * itemsPerPage;
 
+  // 1. Construir consulta SQL
+  let sql = "SELECT * FROM normas WHERE 1=1";
+  const sqlParams = [];
+
+  if (query) {
+    sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ?)";
+    const likeQ = `%${query.toLowerCase()}%`;
+    sqlParams.push({"type": "text", "value": likeQ});
+    sqlParams.push({"type": "text", "value": likeQ});
+    sqlParams.push({"type": "text", "value": likeQ});
+  }
+
+  if (tipo && tipo !== 'todos') {
+    sql += " AND tipo_nombre = ?";
+    sqlParams.push({"type": "text", "value": tipo});
+  }
+
+  if (categoria && categoria !== 'todas') {
+    sql += " AND categoria_nombre = ?";
+    sqlParams.push({"type": "text", "value": categoria});
+  }
+
+  if (anio && anio !== 'todos') {
+    sql += " AND fecha = ?";
+    sqlParams.push({"type": "text", "value": `Año ${anio}`});
+  }
+
+  if (vigencia && vigencia !== 'todos') {
+    const isVigente = vigencia === 'si' ? 1 : 0;
+    sql += " AND vigente = ?";
+    sqlParams.push({"type": "integer", "value": isVigente});
+  }
+
+  const countSql = sql.replace("SELECT *", "SELECT COUNT(*) as total");
+
+  sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
+  const sqlParamsQuery = [...sqlParams];
+  sqlParamsQuery.push({"type": "integer", "value": itemsPerPage});
+  sqlParamsQuery.push({"type": "integer", "value": offset});
+
+  // 2. Ejecutar la llamada REST Nativa de Turso usando fetch (No requiere dependencias de node_modules)
   try {
-    let sql = "SELECT * FROM normas WHERE 1=1";
-    const params = [];
+    const payload = {
+      requests: [
+        {"type": "execute", "stmt": {"sql": countSql, "args": sqlParams}},
+        {"type": "execute", "stmt": {"sql": sql, "args": sqlParamsQuery}}
+      ]
+    };
 
-    if (query) {
-      sql += " AND (numero LIKE ? OR titulo LIKE ? OR resumen LIKE ?)";
-      const likeQuery = `%${query.toLowerCase()}%`;
-      params.push(likeQuery, likeQuery, likeQuery);
-    }
-
-    if (tipo && tipo !== 'todos') {
-      sql += " AND tipo_nombre = ?";
-      params.push(tipo);
-    }
-
-    if (categoria && categoria !== 'todas') {
-      sql += " AND categoria_nombre = ?";
-      params.push(categoria);
-    }
-
-    if (anio && anio !== 'todos') {
-      sql += " AND fecha = ?";
-      params.push(`Año ${anio}`);
-    }
-
-    if (vigencia && vigencia !== 'todos') {
-      const isVigente = vigencia === 'si' ? 1 : 0;
-      sql += " AND vigente = ?";
-      params.push(isVigente);
-    }
-
-    // Obtener total
-    let countSql = sql.replace("SELECT *", "SELECT COUNT(*) as total");
-    const countResult = await client.execute({ sql: countSql, args: params });
-    const totalItems = countResult.rows[0].total;
-
-    // Ejecutar paginacion
-    sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
-    params.push(itemsPerPage, offset);
-
-    const result = await client.execute({ sql: sql, args: params });
-    
-    const normas = result.rows.map(row => ({
-      id: row.id,
-      numero: row.numero,
-      titulo: row.titulo,
-      resumen: row.resumen,
-      tipo_nombre: row.tipo_nombre,
-      categoria_nombre: row.categoria_nombre,
-      vigente: row.vigente === 1,
-      fecha: row.fecha,
-      archivo_pdf: row.archivo_pdf,
-      url_detalle: row.url_detalle
-    }));
-
-    res.status(200).json({
-      normas: normas,
-      total: totalItems,
-      page: currentPage,
-      totalPages: Math.ceil(totalItems / itemsPerPage)
+    const response = await fetch(`${TURSO_URL}/v2/pipeline`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${TURSO_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
     });
 
+    if (response.ok) {
+      const resData = await response.json();
+
+      // Parsear total
+      const countRows = resData.results[0].response.result.rows;
+      const totalItems = countRows.length > 0 ? parseInt(countRows[0][0].value) : 0;
+
+      // Parsear normas
+      const rows = resData.results[1].response.result.rows;
+      const cols = resData.results[1].response.result.cols.map(c => c.name);
+
+      const normas = rows.map(r => {
+        const rowVals = r.map(val => val.value);
+        // Crear diccionario columna -> valor
+        const rowDict = rowVals.reduce((acc, val, idx) => {
+          acc[cols[idx]] = val;
+          return acc;
+        }, {});
+
+        return {
+          id: parseInt(rowDict.id || 0),
+          numero: rowDict.numero,
+          titulo: rowDict.titulo,
+          resumen: rowDict.resumen,
+          tipo_nombre: rowDict.tipo_nombre,
+          categoria_nombre: rowDict.categoria_nombre,
+          vigente: parseInt(rowDict.vigente || 1) === 1,
+          fecha: rowDict.fecha,
+          archivo_pdf: rowDict.archivo_pdf,
+          url_detalle: rowDict.url_detalle
+        };
+      });
+
+      res.status(200).json({
+        normas: normas,
+        total: totalItems,
+        page: currentPage,
+        totalPages: Math.ceil(totalItems / itemsPerPage)
+      });
+    } else {
+      const errText = await response.text();
+      res.status(500).json({ error: `Error de Turso REST: ${errText}` });
+    }
   } catch (error) {
-    console.error("Error en la consulta de Turso:", error);
+    console.error("Error en Serverless API fetch:", error);
     res.status(500).json({ error: error.message });
   }
 }
