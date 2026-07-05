@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client/web';
+import { createClient } from '@libsql/client';
 
 export default async function handler(req, res) {
   // Habilitar CORS
@@ -19,13 +19,13 @@ export default async function handler(req, res) {
   const url = process.env.TURSO_URL || "https://digesto-lospodcastsecretos.aws-us-west-2.turso.io";
   const authToken = process.env.TURSO_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODMyODgxMjQsImlkIjoiMDE5ZjM0NDAtN2UwMS03OTljLWFlOTItODBiMDJmNmVhMjdlIiwia2lkIjoiZ0JFblIyNVR6dEEwaHVWWXljOS03cnRzYThUaGRnbmFEd1ZHSXJrR3FPYyIsInJpZCI6ImE1MGUwMDBmLTQ4ZTgtNDg1ZS04MmM0LTEzNGIxYTA4MmJhYSJ9.ev1b_OISV20t8e9brtO7O4oU9bGnrPYum1LTbBiVng-gaPC2YiUsHzFe-ok2aXmVePtRNYtAmKpb0ntWL6xSCA";
 
-  // Inicializar cliente de Turso
+  // Inicializar cliente estable de Turso compatible con Vercel Serverless
   const client = createClient({
     url: url,
     authToken: authToken,
   });
 
-  // Capturar parámetros de búsqueda
+  // Capturar parámetros
   const { query, tipo, categoria, anio, vigencia, page } = req.query;
 
   const itemsPerPage = 15;
@@ -33,7 +33,6 @@ export default async function handler(req, res) {
   const offset = (currentPage - 1) * itemsPerPage;
 
   try {
-    // 1. Construir consulta SQL dinámica y segura
     let sql = "SELECT * FROM normas WHERE 1=1";
     const params = [];
 
@@ -64,18 +63,17 @@ export default async function handler(req, res) {
       params.push(isVigente);
     }
 
-    // 2. Obtener el conteo total de elementos para la paginación
+    // Obtener total
     let countSql = sql.replace("SELECT *", "SELECT COUNT(*) as total");
     const countResult = await client.execute({ sql: countSql, args: params });
     const totalItems = countResult.rows[0].total;
 
-    // 3. Ejecutar la búsqueda con paginación
+    // Ejecutar paginacion
     sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
     params.push(itemsPerPage, offset);
 
     const result = await client.execute({ sql: sql, args: params });
     
-    // Formatear resultados
     const normas = result.rows.map(row => ({
       id: row.id,
       numero: row.numero,
