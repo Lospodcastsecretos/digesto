@@ -1,0 +1,17 @@
+.git
+output/
+__pycache__/
+venv/
+.venv/
+env/
+credenciales.json
+*.py
+*.pyc
+*.pyo
+*.pyd
+*.png
+*.pdf
+requirements.txt
+package.json
+package-lock.json
+node_modules/
