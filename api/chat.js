@@ -83,8 +83,8 @@ export default async function handler(req, res) {
       
       if (normasRows.length > 0) {
         contextText = normasRows.map(n => {
-          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 2000);
-          return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma:\n${textoDetalle}...`;
+          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
+          return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
         }).join("\n\n---\n\n");
       }
     } catch (e) {
