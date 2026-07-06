@@ -114,63 +114,59 @@ Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya
 Usa un tono profesional pero accesible. Escribe en prosa fluida. Usá negritas (**texto**) para destacar conceptos. No menciones que eres una IA.`;
     }
 
-    // Lista de modelos a intentar (en orden de preferencia)
-    const modelsToTry = [
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite-preview-02-05'
-    ];
+    // Configuración para admitir tanto claves AI Studio (AIzaSy...) como Vertex AI (AQ...)
+    let geminiUrl;
+    let requestHeaders = { 'Content-Type': 'application/json' };
+    let requestBody;
 
-    let lastError = null;
-
-    for (const modelName of modelsToTry) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
-
-        const geminiResponse = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
-              topP: 0.9
-            }
-          })
-        });
-
-        if (!geminiResponse.ok) {
-          const errText = await geminiResponse.text();
-          lastError = `${modelName}: ${geminiResponse.status} - ${errText.substring(0, 200)}`;
-          console.log(`Modelo ${modelName} falló (${geminiResponse.status}), probando siguiente...`);
-          continue; // Probar siguiente modelo
+    if (geminiKey.startsWith('AIzaSy')) {
+      // Endpoint clásico de AI Studio
+      geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      requestBody = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
+          topP: 0.9
         }
-
-        const geminiData = await geminiResponse.json();
-
-        let resumen = 'No se pudo generar el resumen.';
-        if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
-          const parts = geminiData.candidates[0].content.parts;
-          if (parts && parts[0]) {
-            resumen = parts[0].text;
-          }
+      };
+    } else {
+      // Endpoint para claves de Vertex AI / Google Cloud (Claves AQ...)
+      // Nota: Vertex AI utiliza un flujo de autenticación diferente por encabezados
+      geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+      requestHeaders['X-Goog-Api-Key'] = geminiKey;
+      requestBody = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
+          topP: 0.9
         }
+      };
+    }
 
-        // Éxito: devolver el resultado con el nombre del modelo usado
-        res.status(200).json({ resumen, modelo: modelName });
-        return;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody)
+    });
 
-      } catch (fetchErr) {
-        lastError = `${modelName}: ${fetchErr.message}`;
-        console.log(`Modelo ${modelName} error de red, probando siguiente...`);
-        continue;
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      throw new Error(`Error en API de Google Gemini: ${geminiResponse.status} - ${errText}`);
+    }
+
+    const geminiData = await geminiResponse.json();
+
+    let resumen = 'No se pudo generar el resumen.';
+    if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
+      const parts = geminiData.candidates[0].content.parts;
+      if (parts && parts[0]) {
+        resumen = parts[0].text;
       }
     }
 
-    // Si ningún modelo funcionó
-    throw new Error(`Ningún modelo de Gemini disponible. Último error: ${lastError}`);
+    res.status(200).json({ resumen });
 
   } catch (error) {
     console.error("Error en resumen IA:", error);
