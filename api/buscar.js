@@ -1,5 +1,3 @@
-import { createClient } from '@libsql/client/web';
-
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -24,11 +22,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Inicializar cliente optimizado para Vercel Edge Serverless
-  const client = createClient({
-    url: url,
-    authToken: authToken,
-  });
+  // Limpiar URL para usar la REST API de Turso (/v2/pipeline)
+  const cleanUrl = url.replace("libsql://", "https://").replace("http://", "https://");
+  const pipelineUrl = `${cleanUrl}/v2/pipeline`;
 
   const { query, tipo, categoria, anio, vigencia, page } = req.query;
 
@@ -37,7 +33,7 @@ export default async function handler(req, res) {
   const offset = (currentPage - 1) * itemsPerPage;
 
   try {
-    let sql = "SELECT * FROM normas WHERE 1=1";
+    let sql = "SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle FROM normas WHERE 1=1";
     const params = [];
 
     if (query) {
@@ -67,29 +63,102 @@ export default async function handler(req, res) {
       params.push(isVigente);
     }
 
-    // Obtener total
-    let countSql = sql.replace("SELECT *", "SELECT COUNT(*) as total");
-    const countResult = await client.execute({ sql: countSql, args: params });
-    const totalItems = countResult.rows[0].total;
+    // Clonar sql y params para el conteo total
+    let countSql = sql.replace("SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle FROM normas", "SELECT COUNT(*) as total FROM normas");
 
-    // Ejecutar paginacion
-    sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
-    params.push(itemsPerPage, offset);
+    // Construir la consulta paginada
+    let paginatedSql = sql + " ORDER BY id DESC LIMIT ? OFFSET ?";
+    const paginatedParams = [...params, itemsPerPage, offset];
 
-    const result = await client.execute({ sql: sql, args: params });
-    
-    const normas = result.rows.map(row => ({
-      id: row.id,
-      numero: row.numero,
-      titulo: row.titulo,
-      resumen: row.resumen,
-      tipo_nombre: row.tipo_nombre,
-      categoria_nombre: row.categoria_nombre,
-      vigente: row.vigente === 1,
-      fecha: row.fecha,
-      archivo_pdf: row.archivo_pdf,
-      url_detalle: row.url_detalle
-    }));
+    // Helper para formatear argumentos para el endpoint pipeline de Turso
+    const formatArgs = (args) => {
+      return args.map(arg => {
+        if (typeof arg === 'number') {
+          return { type: 'integer', value: arg.toString() };
+        }
+        return { type: 'text', value: arg.toString() };
+      });
+    };
+
+    // Ejecutar ambas consultas en un batch (pipeline) de Turso para máxima velocidad
+    const requestBody = {
+      requests: [
+        {
+          type: "execute",
+          stmt: {
+            sql: countSql,
+            args: formatArgs(params)
+          }
+        },
+        {
+          type: "execute",
+          stmt: {
+            sql: paginatedSql,
+            args: formatArgs(paginatedParams)
+          }
+        },
+        {
+          type: "close"
+        }
+      ]
+    };
+
+    const response = await fetch(pipelineUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Error en API de Turso: ${response.status} - ${errText}`);
+    }
+
+    const responseData = await response.json();
+
+    // Validar respuestas del pipeline
+    const countResponse = responseData.results[0];
+    const selectResponse = responseData.results[1];
+
+    if (countResponse.type === 'error') {
+      throw new Error(`Error en conteo: ${countResponse.error.message}`);
+    }
+    if (selectResponse.type === 'error') {
+      throw new Error(`Error en consulta: ${selectResponse.error.message}`);
+    }
+
+    // Extraer total de items
+    const countRows = countResponse.response.result.rows;
+    const totalItems = countRows.length > 0 ? parseInt(countRows[0][0].value) : 0;
+
+    // Extraer filas de las normas
+    const selectResult = selectResponse.response.result;
+    const cols = selectResult.cols.map(c => c.name);
+    const selectRows = selectResult.rows;
+
+    const normas = selectRows.map(rowValues => {
+      const item = {};
+      cols.forEach((colName, index) => {
+        const valObj = rowValues[index];
+        item[colName] = valObj ? valObj.value : null;
+      });
+
+      return {
+        id: item.id ? parseInt(item.id) : null,
+        numero: item.numero,
+        titulo: item.titulo,
+        resumen: item.resumen,
+        tipo_nombre: item.tipo_nombre,
+        categoria_nombre: item.categoria_nombre,
+        vigente: item.vigente === '1' || item.vigente === 1,
+        fecha: item.fecha,
+        archivo_pdf: item.archivo_pdf,
+        url_detalle: item.url_detalle
+      };
+    });
 
     res.status(200).json({
       normas: normas,
