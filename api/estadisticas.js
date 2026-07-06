@@ -93,30 +93,8 @@ export default async function handler(req, res) {
       params
     );
 
-    // ========== 3. Normas relacionadas (misma categoría, distinto término) ==========
+    // ========== 3. Normas relacionadas (Sección removida de la interfaz) ==========
     let relacionadas = [];
-    if (query) {
-      // Obtener las categorías más frecuentes en la búsqueda actual
-      const topCategorias = await tursoQuery(
-        `SELECT categoria_nombre, COUNT(*) as cnt FROM normas WHERE ${whereStr} AND categoria_nombre IS NOT NULL GROUP BY categoria_nombre ORDER BY cnt DESC LIMIT 3`,
-        params
-      );
-
-      if (topCategorias.length > 0) {
-        const catPlaceholders = topCategorias.map(() => '?').join(',');
-        const catParams = topCategorias.map(c => c.categoria_nombre);
-        const excludeLike = `%${query.toLowerCase()}%`;
-
-        relacionadas = await tursoQuery(
-          `SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, fecha FROM normas 
-           WHERE categoria_nombre IN (${catPlaceholders}) 
-           AND lower(titulo) NOT LIKE ? 
-           AND lower(resumen) NOT LIKE ?
-           ORDER BY RANDOM() LIMIT 10`,
-          [...catParams, excludeLike, excludeLike]
-        );
-      }
-    }
 
     // ========== 4. Top keywords (palabras más frecuentes en títulos) ==========
     const titulosRows = await tursoQuery(
