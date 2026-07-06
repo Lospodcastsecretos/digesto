@@ -15,3 +15,5 @@ venv/
 # Credenciales
 credenciales.json
 
+
+.vercel
