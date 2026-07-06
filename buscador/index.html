@@ -734,6 +734,54 @@
             opacity: 1;
         }
 
+        /* Tooltip de resumen en normas relacionadas */
+        .rel-card {
+            position: relative;
+        }
+
+        .rel-card-tooltip {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: calc(100% + 8px);
+            background: rgba(15, 20, 35, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 0.82rem;
+            line-height: 1.55;
+            color: #c9cdd4;
+            z-index: 20;
+            opacity: 0;
+            transform: translateY(-6px);
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            max-height: 140px;
+            overflow: hidden;
+        }
+
+        .rel-card-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 24px;
+            width: 12px;
+            height: 12px;
+            background: rgba(15, 20, 35, 0.95);
+            border-left: 1px solid rgba(139, 92, 246, 0.25);
+            border-top: 1px solid rgba(139, 92, 246, 0.25);
+            transform: rotate(45deg);
+        }
+
+        .rel-card:hover .rel-card-tooltip {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
         /* === Resumen IA === */
         .ia-container {
             background: rgba(139, 92, 246, 0.05);
@@ -1276,6 +1324,7 @@
                         : r.tipo_nombre === 'Decreto' ? 'badge-categoria'
                         : 'badge-vigente';
                     const titulo = r.titulo ? (r.titulo.length > 100 ? r.titulo.substring(0, 100) + '...' : r.titulo) : 'Sin título';
+                    const resumen = r.resumen ? (r.resumen.length > 200 ? r.resumen.substring(0, 200) + '...' : r.resumen) : 'Sin resumen disponible.';
                     html += `<div class="rel-card" onclick="searchRelated('${(r.numero || '').replace(/'/g, "\\'")}')">
                         <div class="rel-card-top">
                             <span class="rel-card-num">${r.tipo_nombre || 'Norma'} N° ${r.numero || 'S/N'}</span>
@@ -1283,6 +1332,7 @@
                         </div>
                         <div class="rel-card-titulo">${titulo}</div>
                         <div class="rel-card-arrow">→ Clic para buscar esta norma</div>
+                        <div class="rel-card-tooltip">${resumen}</div>
                     </div>`;
                 });
                 html += `</div>`;

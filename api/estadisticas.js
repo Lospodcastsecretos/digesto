@@ -108,7 +108,7 @@ export default async function handler(req, res) {
         const excludeLike = `%${query.toLowerCase()}%`;
 
         relacionadas = await tursoQuery(
-          `SELECT id, numero, titulo, tipo_nombre, categoria_nombre, fecha FROM normas 
+          `SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, fecha FROM normas 
            WHERE categoria_nombre IN (${catPlaceholders}) 
            AND lower(titulo) NOT LIKE ? 
            AND lower(resumen) NOT LIKE ?
@@ -163,6 +163,7 @@ export default async function handler(req, res) {
         numero: r.numero,
         tipo_nombre: r.tipo_nombre,
         titulo: r.titulo,
+        resumen: r.resumen,
         categoria_nombre: r.categoria_nombre,
         fecha: r.fecha
       })),
