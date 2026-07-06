@@ -39,12 +39,8 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             sql_params = []
             
             if query:
-                sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ? OR lower(texto_completo) LIKE ?)"
-                like_q = f"%{query.lower()}%"
-                sql_params.append({"type": "text", "value": like_q})
-                sql_params.append({"type": "text", "value": like_q})
-                sql_params.append({"type": "text", "value": like_q})
-                sql_params.append({"type": "text", "value": like_q})
+                sql += " AND id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?)"
+                sql_params.append({"type": "text", "value": parse_fts_query(query)})
                 
             if tipo != 'todos':
                 sql += " AND tipo_nombre = ?"
@@ -147,6 +143,41 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         return super().do_GET()
+
+def parse_fts_query(q):
+    if not q:
+        return ""
+    import re
+    tokens = re.findall(r'("[^"]+"|-\S+|\S+)', q)
+    parsed_tokens = []
+    
+    for token in tokens:
+        if token.startswith('-'):
+            term = re.sub(r'[^a-zA-Z0-9áéíóúñü]', '', token[1:])
+            if term:
+                parsed_tokens.append(f"NOT {term}")
+        elif token.startswith('"') and token.endswith('"'):
+            clean_inner = re.sub(r'["\']', '', token[1:-1])
+            if clean_inner:
+                parsed_tokens.append(f'"{clean_inner}"')
+        else:
+            clean_word = re.sub(r'[^a-zA-Z0-9áéíóúñü*]', '', token)
+            if clean_word:
+                parsed_tokens.append(clean_word)
+                
+    result = ""
+    for i, t in enumerate(parsed_tokens):
+        if i > 0:
+            if t.startswith("NOT "):
+                result += f" {t}"
+            else:
+                result += f" AND {t}"
+        else:
+            if t.startswith("NOT "):
+                result += f"* {t}"
+            else:
+                result += t
+    return result
 
 handler = MyHandler
 print(f"Iniciando servidor local del Digesto conectado a Turso Cloud en: http://localhost:{PORT}")

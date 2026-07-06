@@ -37,9 +37,8 @@ export default async function handler(req, res) {
     const params = [];
 
     if (query) {
-      sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ? OR lower(texto_completo) LIKE ?)";
-      const likeQuery = `%${query.toLowerCase()}%`;
-      params.push(likeQuery, likeQuery, likeQuery, likeQuery);
+      sql += " AND id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?)";
+      params.push(parseFtsQuery(query));
     }
 
     if (tipo && tipo !== 'todos') {
@@ -171,4 +170,45 @@ export default async function handler(req, res) {
     console.error("Error en la consulta de Turso:", error);
     res.status(500).json({ error: error.message });
   }
+}
+
+// Función auxiliar para formatear la query a la sintaxis MATCH de SQLite FTS5
+function parseFtsQuery(q) {
+  if (!q) return "";
+  
+  // Buscar frases exactas, términos excluidos y palabras comunes
+  const regex = /("[^"]+"|-\S+|\S+)/g;
+  const tokens = q.match(regex) || [];
+  
+  const parsedTokens = tokens.map(token => {
+    if (token.startsWith('-')) {
+      const term = token.substring(1).replace(/[^a-zA-Z0-9áéíóúñü]/g, "");
+      return term ? `NOT ${term}` : "";
+    }
+    if (token.startsWith('"') && token.endsWith('"')) {
+      const cleanInner = token.slice(1, -1).replace(/["']/g, "");
+      return cleanInner ? `"${cleanInner}"` : "";
+    }
+    const cleanWord = token.replace(/[^a-zA-Z0-9áéíóúñü*]/g, "");
+    return cleanWord;
+  }).filter(Boolean);
+  
+  let result = "";
+  for (let i = 0; i < parsedTokens.length; i++) {
+    const t = parsedTokens[i];
+    if (i > 0) {
+      if (t.startsWith("NOT ")) {
+        result += ` ${t}`;
+      } else {
+        result += ` AND ${t}`;
+      }
+    } else {
+      if (t.startsWith("NOT ")) {
+        result += `* ${t}`;
+      } else {
+        result += t;
+      }
+    }
+  }
+  return result;
 }
