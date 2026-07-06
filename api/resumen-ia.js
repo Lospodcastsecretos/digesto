@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -22,6 +20,7 @@ export default async function handler(req, res) {
     } else {
       body = {
         query: req.query.query || '',
+        modo: req.query.modo || '',
         normas: []
       };
     }
@@ -33,7 +32,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Construir contexto de normas para el prompt
+    // Construir contexto de normas
     let normasContext = '';
     if (normas && normas.length > 0) {
       normasContext = normas.slice(0, 12).map((n, i) =>
@@ -85,17 +84,17 @@ ${keywordsContext ? `PALABRAS CLAVE MÁS FRECUENTES EN LOS RESULTADOS: ${keyword
 
 Tu tarea es generar un ANÁLISIS DE CONEXIONES detallado en español (máximo 5 párrafos) que explique:
 
-1. **¿Por qué estas normas relacionadas tienen vínculo con "${query}"?** Explicá la conexión temática, jurídica o administrativa entre el término buscado y las normas sugeridas. ¿Qué tienen en común? ¿Por qué aparecen como relevantes?
+1. ¿Por qué estas normas relacionadas tienen vínculo con "${query}"? Explicá la conexión temática, jurídica o administrativa.
 
-2. **¿Qué revelan las palabras clave?** Analizá las palabras más frecuentes y explicá qué patrones lingüísticos o temáticos evidencian sobre la normativa relacionada con "${query}".
+2. ¿Qué revelan las palabras clave? Analizá los patrones lingüísticos o temáticos.
 
-3. **¿Qué significa la distribución temporal?** Si hay concentración de normas en ciertos años, explicá posibles razones (cambios de gestión, reformas, contexto social o económico).
+3. ¿Qué significa la distribución temporal? Si hay concentración en ciertos años, explicá posibles razones.
 
-4. **¿Qué relación hay entre los tipos de norma?** Si predominan ordenanzas vs. decretos vs. resoluciones, explicá qué implica eso sobre cómo se reguló este tema.
+4. ¿Qué relación hay entre los tipos de norma? Si predominan ordenanzas vs. decretos vs. resoluciones, explicá qué implica.
 
-5. **Conclusión integradora**: Un párrafo final que conecte todos los puntos anteriores en una visión unificada de cómo se vinculan las piezas del análisis.
+5. Conclusión integradora: Un párrafo final que conecte todos los puntos.
 
-Escribí en prosa fluida, profesional pero accesible. No uses listas con viñetas. Usá negritas (**texto**) para destacar conceptos clave. No menciones que sos una IA.`;
+Escribí en prosa fluida, profesional pero accesible. Usá negritas (**texto**) para destacar conceptos clave. No menciones que sos una IA.`;
 
     } else {
       prompt = `Eres un analista jurídico especializado en legislación municipal argentina. Tu tarea es analizar normas del Digesto Municipal de Alta Gracia, Córdoba, Argentina.
@@ -107,32 +106,72 @@ ${statsContext ? `ESTADÍSTICAS DE LA BÚSQUEDA:${statsContext}` : ''}
 ${normasContext ? `NORMAS ENCONTRADAS:\n${normasContext}` : 'No se proporcionaron normas específicas.'}
 
 Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya:
-1. **Panorama general**: Qué revelan estos resultados sobre el tema "${query}" en la normativa de Alta Gracia
-2. **Patrones detectados**: Tendencias temporales, tipos de norma predominantes, o concentración en categorías
-3. **Aspectos relevantes**: Hallazgos importantes o conexiones interesantes entre las normas
-4. **Contexto**: Breve contexto de por qué este tema es relevante para la gestión municipal
+1. Panorama general: Qué revelan estos resultados sobre el tema "${query}" en la normativa de Alta Gracia
+2. Patrones detectados: Tendencias temporales, tipos de norma predominantes, o concentración en categorías
+3. Aspectos relevantes: Hallazgos importantes o conexiones interesantes entre las normas
+4. Contexto: Breve contexto de por qué este tema es relevante para la gestión municipal
 
-Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en prosa fluida. No menciones que eres una IA.`;
+Usa un tono profesional pero accesible. Escribe en prosa fluida. Usá negritas (**texto**) para destacar conceptos. No menciones que eres una IA.`;
     }
 
-    // Inicializar SDK oficial de Google Generative AI con sintaxis correcta
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Lista de modelos a intentar (en orden de preferencia)
+    const modelsToTry = [
+      'gemini-2.0-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-pro-latest',
+      'gemini-pro'
+    ];
 
-    // Generar contenido
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
-        topP: 0.9
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+
+        const geminiResponse = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
+              topP: 0.9
+            }
+          })
+        });
+
+        if (!geminiResponse.ok) {
+          const errText = await geminiResponse.text();
+          lastError = `${modelName}: ${geminiResponse.status} - ${errText.substring(0, 200)}`;
+          console.log(`Modelo ${modelName} falló (${geminiResponse.status}), probando siguiente...`);
+          continue; // Probar siguiente modelo
+        }
+
+        const geminiData = await geminiResponse.json();
+
+        let resumen = 'No se pudo generar el resumen.';
+        if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
+          const parts = geminiData.candidates[0].content.parts;
+          if (parts && parts[0]) {
+            resumen = parts[0].text;
+          }
+        }
+
+        // Éxito: devolver el resultado con el nombre del modelo usado
+        res.status(200).json({ resumen, modelo: modelName });
+        return;
+
+      } catch (fetchErr) {
+        lastError = `${modelName}: ${fetchErr.message}`;
+        console.log(`Modelo ${modelName} error de red, probando siguiente...`);
+        continue;
       }
-    });
+    }
 
-    const response = await result.response;
-    const resumen = response.text() || 'No se pudo generar el texto.';
-    
-    res.status(200).json({ resumen });
+    // Si ningún modelo funcionó
+    throw new Error(`Ningún modelo de Gemini disponible. Último error: ${lastError}`);
 
   } catch (error) {
     console.error("Error en resumen IA:", error);
