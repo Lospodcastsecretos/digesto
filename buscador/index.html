@@ -880,40 +880,18 @@
             </div>
         </aside>
 
-        <!-- Contenedor Principal con Tabs -->
+        <!-- Contenedor Principal de Resultados -->
         <section class="results-panel">
-            
-            <!-- Encabezado de Pestañas -->
-            <div class="tabs-header">
-                <button id="tab-btn-results" class="tab-btn active" onclick="switchTab('results')">
-                    <span>🔍</span> Resultados
-                </button>
-                <button id="tab-btn-stats" class="tab-btn" onclick="switchTab('stats')">
-                    <span>📊</span> Estadísticas e IA
-                </button>
+            <div id="cards-container">
+                <p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando en base de datos de Turso...</p>
             </div>
 
-            <!-- Contenido 1: Resultados de Búsqueda -->
-            <div id="tab-results-content" class="tab-content active">
-                <div id="cards-container">
-                    <p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando en base de datos de Turso...</p>
-                </div>
-
-                <!-- Controles de paginacion -->
-                <div class="pagination">
-                    <button id="btn-prev" class="btn-page" disabled>Anterior</button>
-                    <span id="page-indicator">Página 1 de 1</span>
-                    <button id="btn-next" class="btn-page">Siguiente</button>
-                </div>
+            <!-- Controles de paginacion -->
+            <div class="pagination">
+                <button id="btn-prev" class="btn-page" disabled>Anterior</button>
+                <span id="page-indicator">Página 1 de 1</span>
+                <button id="btn-next" class="btn-page">Siguiente</button>
             </div>
-
-            <!-- Contenido 2: Estadísticas e IA (Segunda Solapa) -->
-            <div id="tab-stats-content" class="tab-content">
-                <div class="stats-grid" id="stats-grid-container">
-                    <p class="sp-empty">Realizá una búsqueda para ver el análisis de estadísticas e IA.</p>
-                </div>
-            </div>
-
         </section>
     </main>
 
@@ -921,9 +899,6 @@
         let currentPage = 1;
         let totalPages = 1;
         let searchTimeout = null;
-        let lastNormas = [];       // Guardar últimas normas para pasar a resumen IA
-        let lastStatsData = null;  // Guardar últimas estadísticas
-        let currentTab = 'results';
 
         // Elementos DOM principales
         const cardsContainer = document.getElementById('cards-container');
@@ -937,33 +912,6 @@
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
         const pageIndicator = document.getElementById('page-indicator');
-
-        // Elementos de Tabs
-        const tabBtnResults = document.getElementById('tab-btn-results');
-        const tabBtnStats = document.getElementById('tab-btn-stats');
-        const tabResultsContent = document.getElementById('tab-results-content');
-        const tabStatsContent = document.getElementById('tab-stats-content');
-        const statsGridContainer = document.getElementById('stats-grid-container');
-
-        // Cambiar entre pestañas
-        window.switchTab = function(tabName) {
-            currentTab = tabName;
-            
-            if (tabName === 'results') {
-                tabBtnResults.classList.add('active');
-                tabBtnStats.classList.remove('active');
-                tabResultsContent.classList.add('active');
-                tabStatsContent.classList.remove('active');
-            } else {
-                tabBtnResults.classList.remove('active');
-                tabBtnStats.classList.add('active');
-                tabResultsContent.classList.remove('active');
-                tabStatsContent.classList.add('active');
-                
-                // Cargar estadísticas si aún no se han consultado para esta búsqueda
-                loadStats();
-            }
-        };
 
         // ============================
         // BÚSQUEDA PRINCIPAL
@@ -999,14 +947,6 @@
                 
                 btnPrev.disabled = currentPage === 1;
                 btnNext.disabled = currentPage >= totalPages;
-
-                // Forzar refresco de las estadísticas si estamos parados en esa solapa
-                if (currentTab === 'stats') {
-                    loadStats();
-                } else {
-                    // Limpiar caché de estadísticas anteriores
-                    lastStatsData = null;
-                }
 
             } catch (error) {
                 console.error("Error consultando la API de Turso:", error);
@@ -1080,242 +1020,6 @@
             if (preview) {
                 preview.classList.toggle('active');
             }
-        };
-
-        // ============================
-        // CARGAR Y RENDERIZAR ESTADÍSTICAS E IA
-        // ============================
-        async function loadStats() {
-            // Evitar recargar si ya tenemos las estadísticas de la búsqueda actual
-            if (lastStatsData) return;
-
-            // Mostrar skeletons de carga
-            statsGridContainer.innerHTML = `
-                <div class="stats-section-card">
-                    <div class="sp-section-title"><span class="sp-icon">📊</span> Frecuencia por Tipo</div>
-                    <div class="sp-skeleton" style="width:50%;height:35px;"></div>
-                    <div class="sp-skeleton" style="width:100%;"></div>
-                    <div class="sp-skeleton" style="width:80%;"></div>
-                </div>
-                <div class="stats-section-card">
-                    <div class="sp-section-title"><span class="sp-icon">📅</span> Distribución Temporal</div>
-                    <div class="sp-skeleton" style="width:100%;height:130px;"></div>
-                </div>
-                <div class="stats-section-card">
-                    <div class="sp-section-title"><span class="sp-icon">☁️</span> Conceptos Clave</div>
-                    <div class="sp-skeleton" style="width:100%;height:100px;"></div>
-                </div>
-                <div class="stats-section-card grid-full-width" id="ia-conexiones-section">
-                    <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
-                    <div class="ia-loading">
-                        <div class="ia-loading-dots"><span></span><span></span><span></span></div>
-                        Mapeando relaciones y vínculos legales...
-                    </div>
-                </div>
-            `;
-
-            const query = searchBox.value.trim();
-            const tipo = tipoFilter.value;
-            const categoria = categoriaFilter.value;
-            const anio = anioFilter.value;
-            const vigencia = vigenciaFilter.value;
-
-            let statsUrl = `/api/estadisticas?`;
-            if (query) statsUrl += `query=${encodeURIComponent(query)}&`;
-            if (tipo !== 'todos') statsUrl += `tipo=${encodeURIComponent(tipo)}&`;
-            if (categoria !== 'todas') statsUrl += `categoria=${encodeURIComponent(categoria)}&`;
-            if (anio !== 'todos') statsUrl += `anio=${encodeURIComponent(anio)}&`;
-            if (vigencia !== 'todos') statsUrl += `vigencia=${encodeURIComponent(vigencia)}&`;
-
-            try {
-                const statsResp = await fetch(statsUrl);
-                if (!statsResp.ok) throw new Error('Error cargando estadísticas');
-                const statsData = await statsResp.json();
-                lastStatsData = statsData;
-
-                renderStatsGrid(statsData);
-
-                // Disparar las consultas asíncronas de Gemini solo si hay un término de búsqueda
-                if (query) {
-                    loadAIResumen(query, statsData);
-                } else {
-                    const conexSection = document.getElementById('ia-conexiones-section');
-                    if (conexSection) {
-                        conexSection.innerHTML = `
-                            <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
-                            <div class="ia-conexiones-container">
-                                <div class="ia-conexiones-text" style="color: var(--text-muted); font-style: italic;">
-                                    Ingresá un término de búsqueda para ver el análisis de conexiones y relaciones entre normas.
-                                </div>
-                            </div>`;
-                    }
-                }
-
-            } catch (error) {
-                console.error("Error cargando estadísticas:", error);
-                statsGridContainer.innerHTML = `<p class="sp-empty">Error al cargar estadísticas: ${error.message}</p>`;
-            }
-        }
-
-        function renderStatsGrid(data) {
-            let html = '';
-
-            // 1. FRECUENCIAS
-            html += `<div class="stats-section-card">
-                <div class="sp-section-title"><span class="sp-icon">📊</span> Frecuencia por Tipo</div>
-                <div class="freq-total">${data.frecuencia.total} <small>normas encontradas</small></div>
-                <div class="freq-bar-container">`;
-
-            const maxCant = Math.max(...data.frecuencia.por_tipo.map(t => t.cantidad), 1);
-            data.frecuencia.por_tipo.forEach(t => {
-                const pct = Math.max((t.cantidad / maxCant) * 100, 8);
-                const barClass = t.tipo === 'Ordenanza' ? 'bar-ordenanza'
-                    : t.tipo === 'Decreto' ? 'bar-decreto'
-                    : t.tipo === 'Resolución' ? 'bar-resolucion'
-                    : 'bar-default';
-                html += `<div class="freq-bar-row">
-                    <div class="freq-bar-label">${t.tipo || 'Otro'}</div>
-                    <div class="freq-bar-track">
-                        <div class="freq-bar-fill ${barClass}" style="width:${pct}%">${t.cantidad}</div>
-                    </div>
-                </div>`;
-            });
-            html += `</div></div>`;
-
-            // 2. TIMELINE
-            html += `<div class="stats-section-card">
-                <div class="sp-section-title"><span class="sp-icon">📅</span> Distribución Temporal</div>`;
-
-            if (data.timeline.length > 0) {
-                const maxT = Math.max(...data.timeline.map(t => t.cantidad), 1);
-                html += `<div class="timeline-chart">`;
-                data.timeline.forEach(t => {
-                    const hPct = Math.max((t.cantidad / maxT) * 100, 5);
-                    const label = t.anio ? t.anio.replace('Año ', '') : '?';
-                    html += `<div class="timeline-bar-wrapper">
-                        <div class="timeline-bar" style="height:${hPct}%">
-                            <div class="timeline-bar-tooltip">${label}: ${t.cantidad}</div>
-                        </div>
-                        <div class="timeline-label">${label}</div>
-                    </div>`;
-                });
-                html += `</div>`;
-            } else {
-                html += `<p class="sp-empty">Sin datos temporales disponibles.</p>`;
-            }
-            html += `</div>`;
-
-            // 5. CONCEPTOS CLAVE
-            html += `<div class="stats-section-card">
-                <div class="sp-section-title"><span class="sp-icon">☁️</span> Conceptos Clave</div>`;
-
-            if (data.keywords.length > 0) {
-                html += `<div class="wordcloud">`;
-                const maxKw = Math.max(...data.keywords.map(k => k.frecuencia), 1);
-                data.keywords.forEach(kw => {
-                    const ratio = kw.frecuencia / maxKw;
-                    const sizeClass = ratio > 0.8 ? 'size-5'
-                        : ratio > 0.6 ? 'size-4'
-                        : ratio > 0.4 ? 'size-3'
-                        : ratio > 0.2 ? 'size-2'
-                        : 'size-1';
-                    html += `<span class="wc-tag ${sizeClass}" onclick="searchKeyword('${kw.palabra.replace(/'/g, "\\'")}')" title="${kw.frecuencia} apariciones">${kw.palabra}</span>`;
-                });
-                html += `</div>`;
-            } else {
-                html += `<p class="sp-empty">Sin palabras clave suficientes.</p>`;
-            }
-            html += `</div>`;
-
-            // 6. ANÁLISIS DE CONEXIONES
-            html += `<div class="stats-section-card grid-full-width" id="ia-conexiones-section">
-                <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
-                <div class="ia-conexiones-container">
-                    <div class="ia-loading">
-                        <div class="ia-loading-dots"><span></span><span></span><span></span></div>
-                        Mapeando relaciones y vínculos legales...
-                    </div>
-                </div>
-            </div>`;
-
-            statsGridContainer.innerHTML = html;
-        }
-
-        // Llamadas asíncronas a Gemini
-        async function loadAIResumen(query, statsData) {
-            loadConexionesIA(query, statsData);
-        }
-
-
-
-        async function loadConexionesIA(query, statsData) {
-            const conexSection = document.getElementById('ia-conexiones-section');
-            if (!conexSection) return;
-
-            try {
-                const resp = await fetch('/api/resumen-ia', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: query || 'búsqueda general',
-                        modo: 'connections' === 'connections' ? 'conexiones' : 'conexiones', // Forzar modo
-                        normas: lastNormas.slice(0, 10).map(n => ({
-                            numero: n.numero,
-                            tipo_nombre: n.tipo_nombre,
-                            titulo: n.titulo,
-                            resumen: n.resumen,
-                            fecha: n.fecha
-                        })),
-                        estadisticas: statsData,
-                        keywords: statsData.keywords || []
-                    })
-                });
-
-                if (!resp.ok) throw new Error('Error en la IA');
-                const data = await resp.json();
-
-                let conexHtml = markdownToHtml(data.resumen);
-
-                conexSection.innerHTML = `
-                    <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
-                    <div class="ia-conexiones-container">
-                        <div class="ia-conexiones-text">${conexHtml}</div>
-                    </div>`;
-
-            } catch (error) {
-                console.error("Error cargando análisis de conexiones:", error);
-                conexSection.innerHTML = `
-                    <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
-                    <div class="ia-conexiones-container">
-                        <div class="ia-conexiones-text" style="color: var(--text-muted); font-style: italic;">
-                            No se pudo generar el análisis de conexiones en este momento.
-                        </div>
-                    </div>`;
-            }
-        }
-
-        function markdownToHtml(text) {
-            let html = text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/\n/g, '<br>');
-            return `<p>${html}</p>`;
-        }
-
-        // Buscar una norma relacionada
-        window.searchRelated = function(numero) {
-            switchTab('results');
-            searchBox.value = numero;
-            currentPage = 1;
-            fetchNormas();
-        };
-
-        // Buscar una palabra clave
-        window.searchKeyword = function(word) {
-            switchTab('results');
-            searchBox.value = word;
-            currentPage = 1;
-            fetchNormas();
         };
 
         // Listeners y debounce de busqueda
