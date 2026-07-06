@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req, res) {
   // Habilitar CORS
@@ -115,21 +115,23 @@ Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya
 Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en prosa fluida. No menciones que eres una IA.`;
     }
 
-    // Inicializar SDK oficial de Google GenAI
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-    
-    // Llamar a gemini-1.5-flash usando el SDK oficial de forma segura
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: prompt,
-      config: {
+    // Inicializar SDK oficial de Google Generative AI con sintaxis correcta
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Generar contenido
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
         temperature: 0.7,
         maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
         topP: 0.9
       }
     });
 
-    const resumen = response.text || 'No se pudo generar el texto.';
+    const response = await result.response;
+    const resumen = response.text() || 'No se pudo generar el texto.';
+    
     res.status(200).json({ resumen });
 
   } catch (error) {
