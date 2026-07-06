@@ -66,9 +66,9 @@ export default async function handler(req, res) {
   // 2. Buscar en Turso si hay keywords (RAG)
   if (keywords.length > 0) {
     try {
-      // Buscar en FTS5 las 4 normas mas relevantes
+      // Buscar en FTS5 las 4 normas mas relevantes (incluyendo texto completo)
       const searchSql = `
-        SELECT id, numero, titulo, resumen, tipo_nombre, fecha
+        SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
         FROM normas 
         WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) 
         ORDER BY rank LIMIT 4
@@ -76,9 +76,10 @@ export default async function handler(req, res) {
       const normasRows = await tursoQuery(searchSql, [keywords]);
       
       if (normasRows.length > 0) {
-        contextText = normasRows.map(n => 
-          `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nResumen: ${n.resumen}`
-        ).join("\n\n");
+        contextText = normasRows.map(n => {
+          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 2000);
+          return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma:\n${textoDetalle}...`;
+        }).join("\n\n---\n\n");
       }
     } catch (e) {
       console.error("Error buscando contexto RAG:", e);
