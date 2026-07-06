@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -114,59 +116,25 @@ Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya
 Usa un tono profesional pero accesible. Escribe en prosa fluida. Usá negritas (**texto**) para destacar conceptos. No menciones que eres una IA.`;
     }
 
-    // Configuración para admitir tanto claves AI Studio (AIzaSy...) como Vertex AI (AQ...)
-    let geminiUrl;
-    let requestHeaders = { 'Content-Type': 'application/json' };
-    let requestBody;
+    // Inicializar SDK oficial de Google Generative AI
+    // Al usar la última versión del SDK (^0.21.0), este objeto procesa
+    // automáticamente de forma correcta las nuevas API Keys de tipo 'AQ...'
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    if (geminiKey.startsWith('AIzaSy')) {
-      // Endpoint clásico de AI Studio
-      geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-      requestBody = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
-          topP: 0.9
-        }
-      };
-    } else {
-      // Endpoint para claves de Vertex AI / Google Cloud (Claves AQ...)
-      // Nota: Vertex AI utiliza un flujo de autenticación diferente por encabezados
-      geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
-      requestHeaders['X-Goog-Api-Key'] = geminiKey;
-      requestBody = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
-          topP: 0.9
-        }
-      };
-    }
-
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: requestHeaders,
-      body: JSON.stringify(requestBody)
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
+        topP: 0.9
+      }
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      throw new Error(`Error en API de Google Gemini: ${geminiResponse.status} - ${errText}`);
-    }
-
-    const geminiData = await geminiResponse.json();
-
-    let resumen = 'No se pudo generar el resumen.';
-    if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
-      const parts = geminiData.candidates[0].content.parts;
-      if (parts && parts[0]) {
-        resumen = parts[0].text;
-      }
-    }
-
-    res.status(200).json({ resumen });
+    const response = await result.response;
+    const resumen = response.text() || 'No se pudo generar el texto.';
+    
+    res.status(200).json({ resumen, modelo: 'gemini-1.5-flash (SDK)' });
 
   } catch (error) {
     console.error("Error en resumen IA:", error);
