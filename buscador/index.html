@@ -1147,8 +1147,21 @@
 
                 renderStatsGrid(statsData);
 
-                // Disparar las consultas asíncronas de Gemini
-                loadAIResumen(query, statsData);
+                // Disparar las consultas asíncronas de Gemini solo si hay un término de búsqueda
+                if (query) {
+                    loadAIResumen(query, statsData);
+                } else {
+                    const conexSection = document.getElementById('ia-conexiones-section');
+                    if (conexSection) {
+                        conexSection.innerHTML = `
+                            <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones Legales (Gemini IA)</div>
+                            <div class="ia-conexiones-container">
+                                <div class="ia-conexiones-text" style="color: var(--text-muted); font-style: italic;">
+                                    Ingresá un término de búsqueda para ver el análisis de conexiones y relaciones entre normas.
+                                </div>
+                            </div>`;
+                    }
+                }
 
             } catch (error) {
                 console.error("Error cargando estadísticas:", error);
