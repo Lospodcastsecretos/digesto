@@ -98,7 +98,7 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
 
     // Usar Fetch puro para evitar problemas con librerías en Vercel
     // Si la clave empieza con AQ... la enviamos tanto en query string como en header por seguridad
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
     
     const geminiResponse = await fetch(url, {
       method: 'POST',
@@ -117,9 +117,9 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
 
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
-      // Si falla, intentamos usar gemini-1.5-flash-8b como último recurso
-      console.log("Fallo con 1.5-flash, error:", errText);
-      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${geminiKey}`;
+      // Si falla, intentamos usar gemini-3.5-flash como último recurso
+      console.log("Fallo con 2.0-flash, error:", errText);
+      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`;
       const fallbackResponse = await fetch(fallbackUrl, {
         method: 'POST',
         headers: { 
@@ -137,7 +137,7 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
       }
 
       const fbData = await fallbackResponse.json();
-      res.status(200).json({ resumen: fbData.candidates[0].content.parts[0].text, modelo: 'gemini-1.5-flash-8b (Fetch Fallback)' });
+      res.status(200).json({ resumen: fbData.candidates[0].content.parts[0].text, modelo: 'gemini-3.5-flash (Fetch Fallback)' });
       return;
     }
 
@@ -148,7 +148,7 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
       resumen = geminiData.candidates[0].content.parts[0].text;
     }
 
-    res.status(200).json({ resumen, modelo: 'gemini-1.5-flash (Fetch Puro)' });
+    res.status(200).json({ resumen, modelo: 'gemini-2.0-flash (Fetch Puro)' });
 
   } catch (error) {
     console.error("Error en resumen IA:", error);
