@@ -69,41 +69,28 @@ export default async function handler(req, res) {
         keywordsContext = keywords.slice(0, 15).map(k => `"${k.palabra}" (${k.frecuencia} apariciones)`).join(', ');
       }
 
-      prompt = `Eres un analista jurídico experto en legislación municipal argentina del Digesto de Alta Gracia, Córdoba.
+      prompt = `Eres un analista jurídico experto en la legislación de Alta Gracia, Córdoba.
+El usuario buscó: "${query}"
 
-El usuario realizó una búsqueda con el término: "${query}"
-
-DATOS DEL ANÁLISIS:
+DATOS:
 ${statsContext}
+${normasContext ? `NORMAS:\n${normasContext}` : ''}
+${relacionadasContext ? `RELACIONADAS:\n${relacionadasContext}` : ''}
+${keywordsContext ? `PALABRAS CLAVE: ${keywordsContext}` : ''}
 
-${normasContext ? `NORMAS PRINCIPALES ENCONTRADAS:\n${normasContext}` : ''}
+Tu tarea es generar un INFORME DE CONEXIONES muy conciso y directo (máximo 3 párrafos o secciones cortas con viñetas) que explique sintéticamente:
+- Por qué se conectan las normas relacionadas sugeridas con "${query}".
+- Qué revelan las palabras clave y tendencias temporales (años).
+- Una breve conclusión integradora de 2 líneas.
 
-${relacionadasContext ? `NORMAS RELACIONADAS SUGERIDAS:\n${relacionadasContext}` : ''}
-
-${keywordsContext ? `PALABRAS CLAVE MÁS FRECUENTES EN LOS RESULTADOS: ${keywordsContext}` : ''}
-
-Tu tarea es generar un ANÁLISIS DE CONEXIONES detallado en español (máximo 5 párrafos) que explique:
-1. ¿Por qué estas normas relacionadas tienen vínculo con "${query}"?
-2. ¿Qué revelan las palabras clave?
-3. ¿Qué significa la distribución temporal?
-4. ¿Qué relación hay entre los tipos de norma?
-5. Conclusión integradora: Un párrafo final.
-
-Usá negritas para destacar conceptos. No menciones que sos una IA.`;
+Sé sumamente directo, preciso y claro. Evita explicaciones redundantes o textos introductorios innecesarios. Usá negritas. No menciones que sos una IA.`;
 
     } else {
-      prompt = `Eres un analista jurídico especializado en legislación municipal. El usuario buscó: "${query}"
-
+      prompt = `Eres un analista jurídico. El usuario buscó: "${query}"
 ${statsContext ? `ESTADÍSTICAS:\n${statsContext}` : ''}
 ${normasContext ? `NORMAS:\n${normasContext}` : ''}
 
-Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos):
-1. Panorama general sobre el tema en Alta Gracia
-2. Patrones detectados (tipos, años)
-3. Aspectos relevantes
-4. Contexto municipal
-
-Usá negritas. No menciones que eres una IA.`;
+Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
     }
 
     // Usar Fetch puro para evitar problemas con librerías en Vercel
@@ -119,8 +106,8 @@ Usá negritas. No menciones que eres una IA.`;
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 5000
+          temperature: 0.5, // Menor temperatura para respuestas más concisas y enfocadas
+          maxOutputTokens: 1500
         }
       })
     });
@@ -138,7 +125,7 @@ Usá negritas. No menciones que eres una IA.`;
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 5000 }
+          generationConfig: { temperature: 0.5, maxOutputTokens: 1500 }
         })
       });
 
