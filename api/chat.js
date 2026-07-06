@@ -115,7 +115,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
 
   // 4. Llamar a Gemini API
   try {
-    const urlGemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    const urlGemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
     
     let geminiResponse = await fetch(urlGemini, {
       method: 'POST',
@@ -127,8 +127,8 @@ Tu respuesta (como asistente jurídico del municipio):`;
     });
 
     if (!geminiResponse.ok) {
-      // Fallback a 3.5 flash si falla por permisos
-      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`;
+      // Fallback a latest si el primero falla temporalmente
+      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
       geminiResponse = await fetch(fallbackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
