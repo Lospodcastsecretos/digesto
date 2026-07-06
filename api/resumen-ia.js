@@ -116,11 +116,10 @@ Usa un tono profesional pero accesible. Escribe en prosa fluida. Usá negritas (
 
     // Lista de modelos a intentar (en orden de preferencia)
     const modelsToTry = [
-      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
       'gemini-2.0-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-pro-latest',
-      'gemini-pro'
+      'gemini-2.0-flash-lite-preview-02-05'
     ];
 
     let lastError = null;
