@@ -807,7 +807,7 @@
         .chat-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); cursor: pointer; z-index: 999; transition: transform 0.3s ease; }
         .chat-btn:hover { transform: scale(1.1); }
         .chat-btn svg { width: 30px; height: 30px; fill: #fff; }
-        .chat-panel { position: fixed; bottom: 100px; right: 30px; width: 380px; height: 500px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 998; opacity: 0; pointer-events: none; transform: translateY(20px); transition: all 0.3s ease; overflow: hidden; }
+        .chat-panel { position: fixed; bottom: 100px; right: 30px; width: 380px; height: 500px; background: #0f172a; border: 1px solid var(--primary); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 9999; opacity: 0; pointer-events: none; transform: translateY(20px); transition: all 0.3s ease; overflow: hidden; }
         .chat-panel.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
         .chat-header { background: linear-gradient(135deg, var(--primary), var(--secondary)); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; color: white; font-family: 'Outfit', sans-serif; font-weight: 600; }
         .chat-close { cursor: pointer; font-size: 1.2rem; }
@@ -920,11 +920,11 @@
         </div>
         <div class="chat-panel" id="chat-panel">
             <div class="chat-header">
-                <span>Asistente Jurídico (IA)</span>
+                <span>Burocracio</span>
                 <span class="chat-close" id="chat-close">&times;</span>
             </div>
             <div class="chat-body" id="chat-body">
-                <div class="chat-msg bot">¡Hola! Soy el asistente virtual del Digesto. Pregúntame sobre cualquier ordenanza o normativa y la buscaré para ti.</div>
+                <div class="chat-msg bot">¡Hola! Soy Burocracio, el asistente virtual del Digesto. Pregúntame sobre cualquier ordenanza o normativa y la buscaré para ti.</div>
                 <div class="chat-typing" id="chat-typing">Escribiendo...</div>
             </div>
             <div class="chat-input-area">
