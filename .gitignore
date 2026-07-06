@@ -1,5 +1,5 @@
-# Excluir la carpeta de descargas individuales (para no saturar GitHub con 9200+ archivos)
-output/descargas/
+# Excluir la carpeta de salida entera
+output/
 
 # Excluir cache de python y archivos del entorno
 __pycache__/
@@ -11,3 +11,7 @@ env/
 venv/
 .idea/
 .vscode/
+
+# Credenciales
+credenciales.json
+
