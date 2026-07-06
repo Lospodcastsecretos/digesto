@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       };
     }
 
-    const { query, normas, estadisticas } = body;
+    const { query, normas, estadisticas, modo, relacionadas, keywords } = body;
 
     if (!query) {
       res.status(400).json({ error: "Se requiere un término de búsqueda." });
@@ -54,8 +54,52 @@ export default async function handler(req, res) {
       }
     }
 
-    // Prompt estructurado para Gemini
-    const prompt = `Eres un analista jurídico especializado en legislación municipal argentina. Tu tarea es analizar normas del Digesto Municipal de Alta Gracia, Córdoba, Argentina.
+    let prompt;
+
+    if (modo === 'conexiones') {
+      // ========== PROMPT DE ANÁLISIS DE CONEXIONES ==========
+      let relacionadasContext = '';
+      if (relacionadas && relacionadas.length > 0) {
+        relacionadasContext = relacionadas.slice(0, 10).map((r, i) =>
+          `${i + 1}. ${r.tipo_nombre || 'Norma'} N° ${r.numero || 'S/N'} — Categoría: ${r.categoria_nombre || 'General'} — "${(r.titulo || '').substring(0, 150)}"`
+        ).join('\n');
+      }
+
+      let keywordsContext = '';
+      if (keywords && keywords.length > 0) {
+        keywordsContext = keywords.slice(0, 15).map(k => `"${k.palabra}" (${k.frecuencia} apariciones)`).join(', ');
+      }
+
+      prompt = `Eres un analista jurídico experto en legislación municipal argentina del Digesto de Alta Gracia, Córdoba.
+
+El usuario realizó una búsqueda con el término: "${query}"
+
+DATOS DEL ANÁLISIS:
+${statsContext}
+
+${normasContext ? `NORMAS PRINCIPALES ENCONTRADAS:\n${normasContext}` : ''}
+
+${relacionadasContext ? `NORMAS RELACIONADAS SUGERIDAS (por categoría temática similar):\n${relacionadasContext}` : ''}
+
+${keywordsContext ? `PALABRAS CLAVE MÁS FRECUENTES EN LOS RESULTADOS: ${keywordsContext}` : ''}
+
+Tu tarea es generar un ANÁLISIS DE CONEXIONES detallado en español (máximo 5 párrafos) que explique:
+
+1. **¿Por qué estas normas relacionadas tienen vínculo con "${query}"?** Explicá la conexión temática, jurídica o administrativa entre el término buscado y las normas sugeridas. ¿Qué tienen en común? ¿Por qué aparecen como relevantes?
+
+2. **¿Qué revelan las palabras clave?** Analizá las palabras más frecuentes y explicá qué patrones lingüísticos o temáticos evidencian sobre la normativa relacionada con "${query}".
+
+3. **¿Qué significa la distribución temporal?** Si hay concentración de normas en ciertos años, explicá posibles razones (cambios de gestión, reformas, contexto social o económico).
+
+4. **¿Qué relación hay entre los tipos de norma?** Si predominan ordenanzas vs. decretos vs. resoluciones, explicá qué implica eso sobre cómo se reguló este tema.
+
+5. **Conclusión integradora**: Un párrafo final que conecte todos los puntos anteriores en una visión unificada de cómo se vinculan las piezas del análisis.
+
+Escribí en prosa fluida, profesional pero accesible. No uses listas con viñetas. Usá negritas (**texto**) para destacar conceptos clave. No menciones que sos una IA.`;
+
+    } else {
+      // ========== PROMPT DE RESUMEN EJECUTIVO (original) ==========
+      prompt = `Eres un analista jurídico especializado en legislación municipal argentina. Tu tarea es analizar normas del Digesto Municipal de Alta Gracia, Córdoba, Argentina.
 
 El usuario buscó: "${query}"
 
@@ -70,6 +114,7 @@ Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya
 4. **Contexto**: Breve contexto de por qué este tema es relevante para la gestión municipal
 
 Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en prosa fluida. No menciones que eres una IA.`;
+    }
 
     // Llamar a la API REST de Gemini
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
@@ -83,7 +128,7 @@ Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en 
         }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 800,
+          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
           topP: 0.9
         }
       })

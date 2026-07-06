@@ -899,6 +899,40 @@
             padding: 20px 0;
             font-style: italic;
         }
+
+        /* === Análisis de Conexiones IA === */
+        .ia-conexiones-container {
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid rgba(6, 182, 212, 0.15);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ia-conexiones-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--emerald), var(--accent));
+            background-size: 200% 100%;
+            animation: iaShimmer 3s linear infinite;
+        }
+
+        .ia-conexiones-text {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #d1d5db;
+        }
+
+        .ia-conexiones-text p {
+            margin-bottom: 12px;
+        }
+
+        .ia-conexiones-text p:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -1363,11 +1397,29 @@
             }
             html += `</div>`;
 
+            // 6. ANÁLISIS DE CONEXIONES IA (placeholder async)
+            html += `<div class="sp-section" id="ia-conexiones-section">
+                <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones (Gemini IA)</div>
+                <div class="ia-conexiones-container">
+                    <div class="ia-loading">
+                        <div class="ia-loading-dots"><span></span><span></span><span></span></div>
+                        Analizando conexiones entre normas, estadísticas y patrones...
+                    </div>
+                </div>
+            </div>`;
+
             spBody.innerHTML = html;
         }
 
-        // Cargar resumen IA (asíncrono, no bloquea el panel)
+        // Cargar resumen IA y análisis de conexiones (asíncronos, no bloquean el panel)
         async function loadAIResumen(query, statsData) {
+            // Lanzar ambas llamadas a Gemini en paralelo
+            loadResumenEjecutivo(query, statsData);
+            loadConexionesIA(query, statsData);
+        }
+
+        // Resumen ejecutivo general
+        async function loadResumenEjecutivo(query, statsData) {
             const iaSection = document.getElementById('ia-section');
             if (!iaSection) return;
 
@@ -1385,12 +1437,7 @@
                 if (!resp.ok) throw new Error('Error en la IA');
                 const data = await resp.json();
 
-                // Convertir markdown simple a HTML
-                let resumenHtml = data.resumen
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\n\n/g, '</p><p>')
-                    .replace(/\n/g, '<br>');
-                resumenHtml = `<p>${resumenHtml}</p>`;
+                let resumenHtml = markdownToHtml(data.resumen);
 
                 iaSection.innerHTML = `
                     <div class="sp-section-title"><span class="sp-icon">🤖</span> Resumen Inteligente (Gemini IA)</div>
@@ -1408,6 +1455,57 @@
                         </div>
                     </div>`;
             }
+        }
+
+        // Análisis de conexiones (sección final)
+        async function loadConexionesIA(query, statsData) {
+            const conexSection = document.getElementById('ia-conexiones-section');
+            if (!conexSection) return;
+
+            try {
+                const resp = await fetch('/api/resumen-ia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query || 'búsqueda general',
+                        modo: 'conexiones',
+                        normas: lastNormas.slice(0, 12),
+                        estadisticas: statsData,
+                        relacionadas: statsData.relacionadas || [],
+                        keywords: statsData.keywords || []
+                    })
+                });
+
+                if (!resp.ok) throw new Error('Error en la IA');
+                const data = await resp.json();
+
+                let conexHtml = markdownToHtml(data.resumen);
+
+                conexSection.innerHTML = `
+                    <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones (Gemini IA)</div>
+                    <div class="ia-conexiones-container">
+                        <div class="ia-conexiones-text">${conexHtml}</div>
+                    </div>`;
+
+            } catch (error) {
+                console.error("Error cargando análisis de conexiones:", error);
+                conexSection.innerHTML = `
+                    <div class="sp-section-title"><span class="sp-icon">🧠</span> Análisis de Conexiones (Gemini IA)</div>
+                    <div class="ia-conexiones-container">
+                        <div class="ia-conexiones-text" style="color: var(--text-muted); font-style: italic;">
+                            No se pudo generar el análisis de conexiones en este momento.
+                        </div>
+                    </div>`;
+            }
+        }
+
+        // Helper: convertir markdown simple a HTML
+        function markdownToHtml(text) {
+            let html = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            return `<p>${html}</p>`;
         }
 
         // Buscar una norma relacionada (clickeable)
