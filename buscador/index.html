@@ -1144,14 +1144,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text, history: chatHistory })
                 });
-                if (!resp.ok) throw new Error('Error en backend');
                 const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Error en backend');
                 
                 chatTyping.style.display = 'none';
                 appendMessage(data.reply, 'bot');
                 chatHistory.push({ role: 'bot', content: data.reply });
             } catch (err) {
-                console.error(err);
+                console.error("Detalle del error del chat:", err);
                 chatTyping.style.display = 'none';
                 appendMessage("Lo siento, hubo un error al conectar con el servidor.", 'bot');
             }

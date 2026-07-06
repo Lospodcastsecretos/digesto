@@ -152,6 +152,6 @@ Tu respuesta (como asistente jurídico del municipio):`;
     res.status(200).json({ reply });
   } catch (error) {
     console.error("Error en API de Chat:", error);
-    res.status(500).json({ error: "Error al generar la respuesta del asistente." });
+    res.status(500).json({ error: "Error interno: " + error.message, stack: error.stack });
   }
 }
