@@ -117,7 +117,7 @@ Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en 
 
     // Inicializar SDK oficial de Google Generative AI con sintaxis correcta
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     // Generar contenido
     const result = await model.generateContent({
