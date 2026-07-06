@@ -73,10 +73,11 @@ export default async function handler(req, res) {
     try {
       // Buscar en FTS5 las 4 normas mas relevantes (incluyendo texto completo)
       const searchSql = `
-        SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
-        FROM normas 
-        WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) 
-        ORDER BY rank LIMIT 4
+        SELECT n.id, n.numero, n.titulo, n.resumen, n.tipo_nombre, n.fecha, n.texto_completo
+        FROM normas n
+        JOIN normas_fts f ON n.id = f.id
+        WHERE normas_fts MATCH ?
+        ORDER BY f.rank LIMIT 4
       `;
       const normasRows = await tursoQuery(searchSql, [keywords]);
       
