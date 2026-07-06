@@ -113,49 +113,64 @@ ${message}
 
 Tu respuesta (como asistente jurídico del municipio):`;
 
-  // 4. Llamar a Gemini API
+  // 4. Llamar a Motores Multi-IA (DeepSeek / Groq)
+  const groqKey = process.env.GROQ_API_KEY || "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";
+  const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
+  
+  let reply = 'Hubo un error al procesar tu consulta.';
+
   try {
-    const urlGemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`;
-    
-    let geminiResponse = await fetch(urlGemini, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+    // Intento 1: DeepSeek (Más inteligente para razonamiento legal)
+    const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1500 }
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ],
+        temperature: 0.2,
+        max_tokens: 1500
       })
     });
 
-    if (!geminiResponse.ok) {
-      const errText1 = await geminiResponse.text();
-      console.error("Fallo con gemini-3.5-flash:", errText1);
-      
-      // Fallback a gemini-1.5-pro (el modelo más antiguo de pago)
-      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`;
-      geminiResponse = await fetch(fallbackUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+    if (dsResp.ok) {
+      const data = await dsResp.json();
+      reply = data.choices[0].message.content;
+    } else {
+      console.warn("Fallo DeepSeek, intentando con Groq...");
+      throw new Error("DeepSeek falló");
+    }
+  } catch (errDeepSeek) {
+    try {
+      // Intento 2: Fallback a Groq (Llama 3 ultrarrápido)
+      const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1500 }
+          model: "llama3-8b-8192",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: message }
+          ],
+          temperature: 0.2,
+          max_tokens: 1500
         })
       });
 
-      if (!geminiResponse.ok) {
-        const errText2 = await geminiResponse.text();
-        throw new Error(`Fallaron los modelos autorizados. Error 3.5: ${errText1} | Error 1.5-pro: ${errText2}`);
+      if (!groqResp.ok) {
+        throw new Error("Ambos proveedores (DeepSeek y Groq) fallaron.");
       }
+      
+      const data = await groqResp.json();
+      reply = data.choices[0].message.content;
+    } catch (errGroq) {
+      console.error("Error en API de Chat Multi-IA:", errGroq);
+      res.status(500).json({ error: "Error interno: " + errGroq.message });
+      return;
     }
-
-    const data = await geminiResponse.json();
-    let reply = 'Hubo un error al procesar tu consulta.';
-    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-      reply = data.candidates[0].content.parts[0].text;
-    }
-
-    res.status(200).json({ reply });
-  } catch (error) {
-    console.error("Error en API de Chat:", error);
-    res.status(500).json({ error: "Error interno: " + error.message, stack: error.stack });
   }
+
+  res.status(200).json({ reply });
 }

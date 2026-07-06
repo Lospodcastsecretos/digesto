@@ -96,59 +96,55 @@ ${normasContext ? `NORMAS:\n${normasContext}` : ''}
 Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
     }
 
-    // Usar Fetch puro para evitar problemas con librerías en Vercel
-    // Si la clave empieza con AQ... la enviamos tanto en query string como en header por seguridad
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-    
-    const geminiResponse = await fetch(url, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-goog-api-key': geminiKey 
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4, // Aún menor temperatura para mayor foco y síntesis
-          maxOutputTokens: 3000
-        }
-      })
-    });
+    const groqKey = process.env.GROQ_API_KEY || "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";
+    const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
+    let resumen = 'No se pudo generar el resumen.';
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      // Si falla, intentamos usar gemini-3.5-flash como último recurso
-      console.log("Fallo con 2.0-flash, error:", errText);
-      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`;
-      const fallbackResponse = await fetch(fallbackUrl, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-goog-api-key': geminiKey 
-        },
+    try {
+      // Intento 1: DeepSeek
+      const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          max_tokens: 3000
         })
       });
 
-      if (!fallbackResponse.ok) {
-        throw new Error(`Error en API: ${fallbackResponse.status} - ${await fallbackResponse.text()}`);
+      if (dsResp.ok) {
+        const data = await dsResp.json();
+        resumen = data.choices[0].message.content;
+        res.status(200).json({ resumen, modelo: 'DeepSeek (Principal)' });
+        return;
+      } else {
+        throw new Error("Fallo DeepSeek");
       }
+    } catch (errDeepSeek) {
+      try {
+        // Intento 2: Groq
+        const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: "llama3-8b-8192",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3,
+            max_tokens: 3000
+          })
+        });
 
-      const fbData = await fallbackResponse.json();
-      res.status(200).json({ resumen: fbData.candidates[0].content.parts[0].text, modelo: 'gemini-3.5-flash (Fetch Fallback)' });
-      return;
+        if (!groqResp.ok) throw new Error("Fallo Groq");
+        
+        const data = await groqResp.json();
+        resumen = data.choices[0].message.content;
+        res.status(200).json({ resumen, modelo: 'Groq (Respaldo)' });
+        return;
+      } catch (errGroq) {
+        throw new Error(`Ambos fallaron. Groq: ${errGroq.message}`);
+      }
     }
-
-    const geminiData = await geminiResponse.json();
-
-    let resumen = 'No se pudo generar el resumen.';
-    if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
-      resumen = geminiData.candidates[0].content.parts[0].text;
-    }
-
-    res.status(200).json({ resumen, modelo: 'gemini-2.0-flash (Fetch Puro)' });
 
   } catch (error) {
     console.error("Error en resumen IA:", error);
