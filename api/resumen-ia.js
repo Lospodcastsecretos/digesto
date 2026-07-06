@@ -117,7 +117,7 @@ Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en 
     }
 
     // Llamar a la API REST de Gemini
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
