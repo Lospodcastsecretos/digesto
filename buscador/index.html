@@ -1372,8 +1372,8 @@
             }
         });
 
-        // Carga inicial
-        fetchNormas();
+        // Carga inicial (no hace fetch de inmediato para comenzar con la página limpia)
+        cardsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 60px;">Ingresá palabras clave o filtros para iniciar la búsqueda de normas.</p>';
     </script>
 </body>
 </html>
