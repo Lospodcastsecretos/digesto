@@ -1203,17 +1203,6 @@
             }
             html += `</div>`;
 
-            // 3. RESUMEN IA
-            html += `<div class="stats-section-card grid-full-width" id="ia-section">
-                <div class="sp-section-title"><span class="sp-icon">🤖</span> Resumen Inteligente (Gemini IA)</div>
-                <div class="ia-container">
-                    <div class="ia-loading">
-                        <div class="ia-loading-dots"><span></span><span></span><span></span></div>
-                        Analizando normas con inteligencia artificial...
-                    </div>
-                </div>
-            </div>`;
-
             // 4. NORMAS RELACIONADAS
             html += `<div class="stats-section-card grid-full-width">
                 <div class="sp-section-title"><span class="sp-icon">🔗</span> Normas Relacionadas</div>`;
@@ -1281,47 +1270,10 @@
 
         // Llamadas asíncronas a Gemini
         async function loadAIResumen(query, statsData) {
-            loadResumenEjecutivo(query, statsData);
             loadConexionesIA(query, statsData);
         }
 
-        async function loadResumenEjecutivo(query, statsData) {
-            const iaSection = document.getElementById('ia-section');
-            if (!iaSection) return;
 
-            try {
-                const resp = await fetch('/api/resumen-ia', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: query || 'búsqueda general',
-                        normas: lastNormas.slice(0, 12),
-                        estadisticas: statsData
-                    })
-                });
-
-                if (!resp.ok) throw new Error('Error en la IA');
-                const data = await resp.json();
-
-                let resumenHtml = markdownToHtml(data.resumen);
-
-                iaSection.innerHTML = `
-                    <div class="sp-section-title"><span class="sp-icon">🤖</span> Resumen Inteligente (Gemini IA)</div>
-                    <div class="ia-container">
-                        <div class="ia-text">${resumenHtml}</div>
-                    </div>`;
-
-            } catch (error) {
-                console.error("Error cargando resumen IA:", error);
-                iaSection.innerHTML = `
-                    <div class="sp-section-title"><span class="sp-icon">🤖</span> Resumen Inteligente (Gemini IA)</div>
-                    <div class="ia-container">
-                        <div class="ia-text" style="color: var(--text-muted); font-style: italic;">
-                            No se pudo generar el resumen inteligente en este momento.
-                        </div>
-                    </div>`;
-            }
-        }
 
         async function loadConexionesIA(query, statsData) {
             const conexSection = document.getElementById('ia-conexiones-section');
