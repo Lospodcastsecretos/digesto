@@ -1300,9 +1300,21 @@
                     body: JSON.stringify({
                         query: query || 'búsqueda general',
                         modo: 'connections' === 'connections' ? 'conexiones' : 'conexiones', // Forzar modo
-                        normas: lastNormas.slice(0, 12),
+                        normas: lastNormas.slice(0, 10).map(n => ({
+                            numero: n.numero,
+                            tipo_nombre: n.tipo_nombre,
+                            titulo: n.titulo,
+                            resumen: n.resumen,
+                            fecha: n.fecha
+                        })),
                         estadisticas: statsData,
-                        relacionadas: statsData.relacionadas || [],
+                        relacionadas: (statsData.relacionadas || []).slice(0, 8).map(r => ({
+                            numero: r.numero,
+                            tipo_nombre: r.tipo_nombre,
+                            titulo: r.titulo,
+                            resumen: r.resumen,
+                            categoria_nombre: r.categoria_nombre
+                        })),
                         keywords: statsData.keywords || []
                     })
                 });
