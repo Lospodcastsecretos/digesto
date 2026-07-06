@@ -818,7 +818,7 @@
             <div class="filter-group">
                 <h3>Búsqueda</h3>
                 <div class="search-wrapper">
-                    <input type="text" id="search-box" class="search-input" placeholder="Escribe palabras clave, nro...">
+                    <input type="text" id="search-box" class="search-input" placeholder="Escribe palabras clave, nro..." autocomplete="off" spellcheck="false">
                 </div>
             </div>
 
@@ -969,6 +969,7 @@
         // BÚSQUEDA PRINCIPAL
         // ============================
         async function fetchNormas() {
+            console.log("-> Ejecutando fetchNormas(). Query actual:", searchBox.value.trim(), "Pagina:", currentPage);
             cardsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando normas...</p>';
             
             const query = searchBox.value.trim();
