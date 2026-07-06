@@ -1101,11 +1101,6 @@
                     <div class="sp-section-title"><span class="sp-icon">📅</span> Distribución Temporal</div>
                     <div class="sp-skeleton" style="width:100%;height:130px;"></div>
                 </div>
-                <div class="stats-section-card grid-full-width">
-                    <div class="sp-section-title"><span class="sp-icon">🔗</span> Normas Relacionadas</div>
-                    <div class="sp-skeleton" style="width:100%;height:80px;"></div>
-                    <div class="sp-skeleton" style="width:100%;height:80px;"></div>
-                </div>
                 <div class="stats-section-card">
                     <div class="sp-section-title"><span class="sp-icon">☁️</span> Conceptos Clave</div>
                     <div class="sp-skeleton" style="width:100%;height:100px;"></div>
@@ -1210,35 +1205,6 @@
             }
             html += `</div>`;
 
-            // 4. NORMAS RELACIONADAS
-            html += `<div class="stats-section-card grid-full-width">
-                <div class="sp-section-title"><span class="sp-icon">🔗</span> Normas Relacionadas</div>`;
-
-            if (data.relacionadas.length > 0) {
-                html += `<div class="rel-list">`;
-                data.relacionadas.forEach(r => {
-                    const badgeClass = r.tipo_nombre === 'Ordenanza' ? 'badge-tipo'
-                        : r.tipo_nombre === 'Decreto' ? 'badge-categoria'
-                        : 'badge-vigente';
-                    const titulo = r.titulo ? (r.titulo.length > 130 ? r.titulo.substring(0, 130) + '...' : r.titulo) : 'Sin título';
-                    const resumen = r.resumen ? (r.resumen.length > 220 ? r.resumen.substring(0, 220) + '...' : r.resumen) : 'Sin resumen disponible.';
-                    
-                    html += `<div class="rel-card" onclick="searchRelated('${(r.numero || '').replace(/'/g, "\\'")}')">
-                        <div class="rel-card-top">
-                            <span class="rel-card-num">${r.tipo_nombre || 'Norma'} N° ${r.numero || 'S/N'}</span>
-                            <span class="badge rel-card-badge ${badgeClass}">${r.categoria_nombre || 'General'}</span>
-                        </div>
-                        <div class="rel-card-titulo">${titulo}</div>
-                        <div class="rel-card-inline-resumen"><strong>Resumen:</strong> ${resumen}</div>
-                        <div class="rel-card-arrow">Clic para ir a la norma →</div>
-                    </div>`;
-                });
-                html += `</div>`;
-            } else {
-                html += `<p class="sp-empty">No se encontraron normas relacionadas para ampliar la búsqueda.</p>`;
-            }
-            html += `</div>`;
-
             // 5. CONCEPTOS CLAVE
             html += `<div class="stats-section-card">
                 <div class="sp-section-title"><span class="sp-icon">☁️</span> Conceptos Clave</div>`;
@@ -1301,13 +1267,6 @@
                             fecha: n.fecha
                         })),
                         estadisticas: statsData,
-                        relacionadas: (statsData.relacionadas || []).slice(0, 8).map(r => ({
-                            numero: r.numero,
-                            tipo_nombre: r.tipo_nombre,
-                            titulo: r.titulo,
-                            resumen: r.resumen,
-                            categoria_nombre: r.categoria_nombre
-                        })),
                         keywords: statsData.keywords || []
                     })
                 });
