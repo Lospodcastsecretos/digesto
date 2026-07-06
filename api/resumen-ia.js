@@ -1,3 +1,5 @@
+import { GoogleGenAI } from '@google/generative-ai';
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -18,7 +20,6 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       body = req.body;
     } else {
-      // GET fallback
       body = {
         query: req.query.query || '',
         normas: []
@@ -57,7 +58,6 @@ export default async function handler(req, res) {
     let prompt;
 
     if (modo === 'conexiones') {
-      // ========== PROMPT DE ANÁLISIS DE CONEXIONES ==========
       let relacionadasContext = '';
       if (relacionadas && relacionadas.length > 0) {
         relacionadasContext = relacionadas.slice(0, 10).map((r, i) =>
@@ -98,7 +98,6 @@ Tu tarea es generar un ANÁLISIS DE CONEXIONES detallado en español (máximo 5 
 Escribí en prosa fluida, profesional pero accesible. No uses listas con viñetas. Usá negritas (**texto**) para destacar conceptos clave. No menciones que sos una IA.`;
 
     } else {
-      // ========== PROMPT DE RESUMEN EJECUTIVO (original) ==========
       prompt = `Eres un analista jurídico especializado en legislación municipal argentina. Tu tarea es analizar normas del Digesto Municipal de Alta Gracia, Córdoba, Argentina.
 
 El usuario buscó: "${query}"
@@ -116,40 +115,21 @@ Genera un RESUMEN EJECUTIVO en español (máximo 4 párrafos cortos) que incluya
 Usa un tono profesional pero accesible. No uses listas con viñetas, escribe en prosa fluida. No menciones que eres una IA.`;
     }
 
-    // Llamar a la API REST de Gemini
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
-          topP: 0.9
-        }
-      })
+    // Inicializar SDK oficial de Google GenAI
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    
+    // Llamar a gemini-1.5-flash usando el SDK oficial de forma segura
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: modo === 'conexiones' ? 1200 : 800,
+        topP: 0.9
+      }
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      throw new Error(`Error en Gemini API: ${geminiResponse.status} - ${errText}`);
-    }
-
-    const geminiData = await geminiResponse.json();
-
-    // Extraer texto de la respuesta de Gemini
-    let resumen = 'No se pudo generar el resumen.';
-    if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content) {
-      const parts = geminiData.candidates[0].content.parts;
-      if (parts && parts[0]) {
-        resumen = parts[0].text;
-      }
-    }
-
+    const resumen = response.text || 'No se pudo generar el texto.';
     res.status(200).json({ resumen });
 
   } catch (error) {

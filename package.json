@@ -2,6 +2,6 @@
   "name": "digesto-buscador-api",
   "version": "1.0.0",
   "dependencies": {
-    "@libsql/client": "^0.3.1"
+    "@google/generative-ai": "^0.1.1"
   }
 }
