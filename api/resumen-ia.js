@@ -78,12 +78,15 @@ ${normasContext ? `NORMAS:\n${normasContext}` : ''}
 ${relacionadasContext ? `RELACIONADAS:\n${relacionadasContext}` : ''}
 ${keywordsContext ? `PALABRAS CLAVE: ${keywordsContext}` : ''}
 
-Tu tarea es generar un INFORME DE CONEXIONES muy conciso y directo (máximo 3 párrafos o secciones cortas con viñetas) que explique sintéticamente:
-- Por qué se conectan las normas relacionadas sugeridas con "${query}".
-- Qué revelan las palabras clave y tendencias temporales (años).
-- Una breve conclusión integradora de 2 líneas.
+Tu tarea es generar un INFORME DE CONEXIONES extremadamente conciso, directo y al grano (máximo 3 párrafos o bloques cortos de viñetas):
+- Explica sintéticamente en 1 o 2 oraciones breves por qué se conectan las normas sugeridas con "${query}".
+- Explica en 1 o 2 oraciones breves la tendencia de las palabras clave y años.
+- Conclusión integradora de 1 o 2 líneas.
 
-Sé sumamente directo, preciso y claro. Evita explicaciones redundantes o textos introductorios innecesarios. Usá negritas. No menciones que sos una IA.`;
+REGLAS CRÍTICAS:
+- Sé extremadamente escueto. Ve directo a los datos sin rodeos, introducciones o saludos.
+- Usa oraciones cortas y de lectura rápida.
+- Usá negritas para destacar. No menciones que sos una IA.`;
 
     } else {
       prompt = `Eres un analista jurídico. El usuario buscó: "${query}"
@@ -106,8 +109,8 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.5, // Menor temperatura para respuestas más concisas y enfocadas
-          maxOutputTokens: 1500
+          temperature: 0.4, // Aún menor temperatura para mayor foco y síntesis
+          maxOutputTokens: 3000
         }
       })
     });
@@ -125,7 +128,7 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.5, maxOutputTokens: 1500 }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
         })
       });
 
