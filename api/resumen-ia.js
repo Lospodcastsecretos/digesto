@@ -120,7 +120,7 @@ Usá negritas. No menciones que eres una IA.`;
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: modo === 'conexiones' ? 2500 : 2048
+          maxOutputTokens: 5000
         }
       })
     });
@@ -138,7 +138,7 @@ Usá negritas. No menciones que eres una IA.`;
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 5000 }
         })
       });
 
