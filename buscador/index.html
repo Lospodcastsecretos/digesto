@@ -1032,6 +1032,13 @@
         }
 
         searchBox.addEventListener('input', handleSearchInput);
+        searchBox.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout);
+                currentPage = 1;
+                fetchNormas();
+            }
+        });
         tipoFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
         categoriaFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
         anioFilter.addEventListener('change', () => { currentPage = 1; fetchNormas(); });
