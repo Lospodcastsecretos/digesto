@@ -17,3 +17,4 @@ credenciales.json
 
 
 .vercel
+.env*.local

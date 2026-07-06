@@ -468,10 +468,7 @@
         const btnNext = document.getElementById('btn-next');
         const pageIndicator = document.getElementById('page-indicator');
 
-        // URL publica de tu Firebase Realtime Database
-        const FIREBASE_DB_URL = "https://digestoag-cb08c-default-rtdb.firebaseio.com/normas.json";
-
-        // Hacer la consulta HTTP en tiempo real a la Serverless API de Vercel / Servidor local
+        // Hacer la consulta HTTP a la API Serverless local/remota
         async function fetchNormas() {
             cardsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Buscando normas...</p>';
             
@@ -527,13 +524,11 @@
                 const hasFile = !!filename;
                 const esVigente = item.vigente === true;
 
-                // Mapear descarga local
                 let fileUrl = '#';
                 if (hasFile) {
                     fileUrl = `/descargas/${filename}`;
                 }
 
-                // Formatear descripcion
                 let desc = item.titulo || item.resumen || "Sin descripción disponible.";
                 if (desc.length > 280) {
                     desc = desc.substring(0, 280) + '...';
