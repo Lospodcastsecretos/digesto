@@ -734,51 +734,52 @@
             opacity: 1;
         }
 
-        /* Tooltip de resumen en normas relacionadas */
+        /* Tooltip de resumen en normas relacionadas (a la izquierda) */
         .rel-card {
             position: relative;
         }
 
         .rel-card-tooltip {
             position: absolute;
-            left: 0;
-            right: 0;
-            top: calc(100% + 8px);
-            background: rgba(15, 20, 35, 0.95);
+            right: calc(100% + 15px);
+            top: 50%;
+            transform: translateY(-50%) translateX(10px);
+            width: 320px;
+            background: rgba(15, 20, 35, 0.98);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(139, 92, 246, 0.25);
+            border: 1px solid rgba(139, 92, 246, 0.35);
             border-radius: 12px;
             padding: 14px 16px;
             font-size: 0.82rem;
             line-height: 1.55;
-            color: #c9cdd4;
-            z-index: 20;
+            color: #e5e7eb;
+            z-index: 9999;
             opacity: 0;
-            transform: translateY(-6px);
             pointer-events: none;
             transition: opacity 0.25s ease, transform 0.25s ease;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-            max-height: 140px;
-            overflow: hidden;
+            box-shadow: -8px 8px 30px rgba(0, 0, 0, 0.6);
+            max-height: 220px;
+            overflow-y: auto;
         }
 
         .rel-card-tooltip::before {
             content: '';
             position: absolute;
-            top: -6px;
-            left: 24px;
+            top: 50%;
+            right: -6px;
+            margin-top: -6px;
             width: 12px;
             height: 12px;
-            background: rgba(15, 20, 35, 0.95);
-            border-left: 1px solid rgba(139, 92, 246, 0.25);
-            border-top: 1px solid rgba(139, 92, 246, 0.25);
+            background: rgba(15, 20, 35, 0.98);
+            border-right: 1px solid rgba(139, 92, 246, 0.35);
+            border-top: 1px solid rgba(139, 92, 246, 0.35);
             transform: rotate(45deg);
         }
 
         .rel-card:hover .rel-card-tooltip {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(-50%) translateX(0);
             pointer-events: auto;
         }
 
