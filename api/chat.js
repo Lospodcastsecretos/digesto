@@ -115,7 +115,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
 
   // 4. Llamar a Gemini API
   try {
-    const urlGemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const urlGemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`;
     
     let geminiResponse = await fetch(urlGemini, {
       method: 'POST',
@@ -127,8 +127,11 @@ Tu respuesta (como asistente jurídico del municipio):`;
     });
 
     if (!geminiResponse.ok) {
-      // Fallback a latest si el primero falla temporalmente
-      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
+      const errText1 = await geminiResponse.text();
+      console.error("Fallo con gemini-3.5-flash:", errText1);
+      
+      // Fallback a gemini-1.5-pro (el modelo más antiguo de pago)
+      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`;
       geminiResponse = await fetch(fallbackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
@@ -137,10 +140,11 @@ Tu respuesta (como asistente jurídico del municipio):`;
           generationConfig: { temperature: 0.3, maxOutputTokens: 1500 }
         })
       });
-    }
 
-    if (!geminiResponse.ok) {
-      throw new Error("Ambos modelos fallaron: " + await geminiResponse.text());
+      if (!geminiResponse.ok) {
+        const errText2 = await geminiResponse.text();
+        throw new Error(`Fallaron los modelos autorizados. Error 3.5: ${errText1} | Error 1.5-pro: ${errText2}`);
+      }
     }
 
     const data = await geminiResponse.json();
