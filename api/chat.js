@@ -57,9 +57,14 @@ export default async function handler(req, res) {
   }
 
   // 1. Extraer palabras clave de la pregunta para buscar en Turso
-  const stopWords = ['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con'];
-  const words = message.toLowerCase().replace(/[^a-záéíóúñü\s]/g, '').split(' ');
-  const keywords = words.filter(w => w.length > 3 && !stopWords.includes(w)).join(' OR ');
+  const stopWords = new Set(['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con', 'en', 'y', 'o', 'a', 'al', 'su', 'sus', 'te', 'tu', 'mi', 'se', 'lo', 'le']);
+  const words = message.toLowerCase().replace(/[^a-záéíóúñü\s0-9]/g, '').split(/\s+/);
+  
+  // Mantener palabras de >= 3 letras que no sean stop words
+  const relevantWords = words.filter(w => w.length >= 3 && !stopWords.has(w));
+  
+  // Agregar wildcard '*' a cada palabra y unirlas con OR para máxima flexibilidad en FTS5
+  const keywords = relevantWords.map(w => `"${w}"*`).join(' OR ');
 
   let contextText = "No se encontraron normas específicas relacionadas con la pregunta actual.";
 
