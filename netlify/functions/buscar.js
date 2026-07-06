@@ -31,8 +31,9 @@ exports.handler = async function(event, context) {
   const sqlParams = [];
 
   if (query) {
-    sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ?)";
+    sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ? OR lower(texto_completo) LIKE ?)";
     const likeQ = `%${query.toLowerCase()}%`;
+    sqlParams.push({"type": "text", "value": likeQ});
     sqlParams.push({"type": "text", "value": likeQ});
     sqlParams.push({"type": "text", "value": likeQ});
     sqlParams.push({"type": "text", "value": likeQ});

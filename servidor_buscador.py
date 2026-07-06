@@ -39,8 +39,9 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             sql_params = []
             
             if query:
-                sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ?)"
+                sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ? OR lower(texto_completo) LIKE ?)"
                 like_q = f"%{query.lower()}%"
+                sql_params.append({"type": "text", "value": like_q})
                 sql_params.append({"type": "text", "value": like_q})
                 sql_params.append({"type": "text", "value": like_q})
                 sql_params.append({"type": "text", "value": like_q})

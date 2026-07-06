@@ -37,9 +37,9 @@ export default async function handler(req, res) {
     const params = [];
 
     if (query) {
-      sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ?)";
+      sql += " AND (lower(numero) LIKE ? OR lower(titulo) LIKE ? OR lower(resumen) LIKE ? OR lower(texto_completo) LIKE ?)";
       const likeQuery = `%${query.toLowerCase()}%`;
-      params.push(likeQuery, likeQuery, likeQuery);
+      params.push(likeQuery, likeQuery, likeQuery, likeQuery);
     }
 
     if (tipo && tipo !== 'todos') {
