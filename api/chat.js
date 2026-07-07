@@ -142,64 +142,94 @@ ${message}
 
 Tu respuesta (como asistente jurídico del municipio):`;
 
-  // 4. Llamar a Motores Multi-IA (DeepSeek / Groq)
+  // 4. Configurar headers para Streaming SSE
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+
   const groqKey = process.env.GROQ_API_KEY || "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";
   const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
-  
-  let reply = 'Hubo un error al procesar tu consulta.';
+
+  async function streamOpenAI(url, apiKey, bodyData) {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        ...bodyData,
+        stream: true
+      })
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Status ${resp.status}: ${errText}`);
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for await (const chunk of resp.body) {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (!cleanLine) continue;
+        if (cleanLine === 'data: [DONE]') continue;
+        if (cleanLine.startsWith('data: ')) {
+          try {
+            const jsonStr = cleanLine.substring(6);
+            const parsed = JSON.parse(jsonStr);
+            const delta = parsed.choices[0].delta?.content || '';
+            if (delta) {
+              res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+            }
+          } catch (err) {
+            // Ignorar errores parciales de JSON
+          }
+        }
+      }
+    }
+  }
 
   try {
-    // Intento 1: DeepSeek (Más inteligente para razonamiento legal)
-    const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
-      body: JSON.stringify({
-        model: "deepseek-chat",
+    // Intento 1: DeepSeek Streaming
+    await streamOpenAI("https://api.deepseek.com/chat/completions", deepseekKey, {
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message }
+      ],
+      temperature: 0.2,
+      max_tokens: 1500
+    });
+  } catch (errDeepSeek) {
+    console.warn("Fallo DeepSeek Stream, intentando con Groq...", errDeepSeek.message);
+    try {
+      // Intento 2: Fallback Groq Streaming
+      await streamOpenAI("https://api.groq.com/openai/v1/chat/completions", groqKey, {
+        model: "llama3-8b-8192",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message }
         ],
         temperature: 0.2,
         max_tokens: 1500
-      })
-    });
-
-    if (dsResp.ok) {
-      const data = await dsResp.json();
-      reply = data.choices[0].message.content;
-    } else {
-      console.warn("Fallo DeepSeek, intentando con Groq...");
-      throw new Error("DeepSeek falló");
-    }
-  } catch (errDeepSeek) {
-    try {
-      // Intento 2: Fallback a Groq (Llama 3 ultrarrápido)
-      const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
-        body: JSON.stringify({
-          model: "llama3-8b-8192",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ],
-          temperature: 0.2,
-          max_tokens: 1500
-        })
       });
-
-      if (!groqResp.ok) {
-        throw new Error("Ambos proveedores (DeepSeek y Groq) fallaron.");
-      }
-      
-      const data = await groqResp.json();
-      reply = data.choices[0].message.content;
     } catch (errGroq) {
-      console.error("Error en API de Chat Multi-IA:", errGroq);
-      res.status(500).json({ error: "Error interno: " + errGroq.message });
-      return;
+      console.error("Error en API de Chat Multi-IA (Groq falló también):", errGroq);
+      res.write(`data: ${JSON.stringify({ error: "No se pudo conectar con los proveedores de IA: " + errGroq.message })}\n\n`);
     }
   }
 
-  res.status(200).json({ reply, suggestedNorms });
+  // Enviar las sugerencias de normas y finalizar la conexión
+  res.write(`data: ${JSON.stringify({ suggestedNorms })}\n\n`);
+  res.end();
 }

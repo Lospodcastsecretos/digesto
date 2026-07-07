@@ -1167,25 +1167,13 @@
             });
         }
 
-        function appendMessage(text, sender, suggestedNorms = []) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `chat-msg ${sender}`;
-            if (sender === 'bot') {
-                msgDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-            } else {
-                msgDiv.textContent = text;
-            }
-            chatBody.insertBefore(msgDiv, chatTyping);
-
-            // Renderizar píldoras de sugerencias si vienen normas
-            if (sender === 'bot' && suggestedNorms && suggestedNorms.length > 0) {
+        function renderSuggestedNorms(suggestedNorms) {
+            if (suggestedNorms && suggestedNorms.length > 0) {
                 const suggDiv = document.createElement('div');
                 suggDiv.className = 'chat-msg-suggestions';
                 
                 suggestedNorms.forEach(n => {
-                    // Escapar posibles comillas en el título
                     const escapedTitle = (n.titulo || '').replace(/'/g, "\\'");
-                    
                     const btn = document.createElement('button');
                     btn.className = 'chat-suggest-btn';
                     btn.innerHTML = `📎 Adjuntar ${n.tipo_nombre} ${n.numero}`;
@@ -1195,8 +1183,25 @@
                 
                 chatBody.insertBefore(suggDiv, chatTyping);
             }
+        }
+
+        function appendMessage(text, sender, suggestedNorms = []) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `chat-msg ${sender}`;
+            if (sender === 'bot') {
+                // Parsear formato básico o Markdown
+                msgDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+            } else {
+                msgDiv.textContent = text;
+            }
+            chatBody.insertBefore(msgDiv, chatTyping);
+
+            if (sender === 'bot' && suggestedNorms && suggestedNorms.length > 0) {
+                renderSuggestedNorms(suggestedNorms);
+            }
 
             chatBody.scrollTop = chatBody.scrollHeight;
+            return msgDiv;
         }
 
         async function sendMessage() {
@@ -1221,12 +1226,64 @@
                         attachedNormIds: attachedIds
                     })
                 });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Error en backend');
+
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({ error: 'Error en servidor' }));
+                    throw new Error(errData.error || 'Error en servidor');
+                }
                 
                 chatTyping.style.display = 'none';
-                appendMessage(data.reply, 'bot', data.suggestedNorms);
-                chatHistory.push({ role: 'bot', content: data.reply });
+                
+                // Elemento para renderizar la respuesta del bot token a token
+                const botMsgDiv = appendMessage('', 'bot');
+                let replyText = '';
+                let finalSuggestedNorms = [];
+                let buffer = '';
+
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        const cleanLine = line.trim();
+                        if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+
+                        try {
+                            const jsonStr = cleanLine.substring(6);
+                            const parsed = JSON.parse(jsonStr);
+
+                            if (parsed.error) {
+                                botMsgDiv.innerHTML = `<span style="color: #ef4444;">Error: ${parsed.error}</span>`;
+                            } else if (parsed.text) {
+                                replyText += parsed.text;
+                                // Reemplazar formato básico de negritas y saltos de línea para el stream en vivo
+                                botMsgDiv.innerHTML = replyText
+                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                    .replace(/\n\n/g, '</p><p>')
+                                    .replace(/\n/g, '<br>');
+                                chatBody.scrollTop = chatBody.scrollHeight;
+                            } else if (parsed.suggestedNorms) {
+                                finalSuggestedNorms = parsed.suggestedNorms;
+                            }
+                        } catch (e) {
+                            // Ignorar errores parciales de JSON
+                        }
+                    }
+                }
+
+                // Renderizar sugerencias al final
+                if (finalSuggestedNorms && finalSuggestedNorms.length > 0) {
+                    renderSuggestedNorms(finalSuggestedNorms);
+                }
+
+                chatHistory.push({ role: 'bot', content: replyText });
             } catch (err) {
                 console.error("Detalle del error del chat:", err);
                 chatTyping.style.display = 'none';
