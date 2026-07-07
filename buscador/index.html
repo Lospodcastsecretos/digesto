@@ -1210,13 +1210,29 @@
             return msgDiv;
         }
 
-        async function sendMessage() {
-            const text = chatInput.value.trim();
-            if (!text) return;
+        let lastUserMessage = '';
+
+        window.retryLastMessage = function(btnElement) {
+            if (btnElement && btnElement.closest('.error-state')) {
+                btnElement.closest('.error-state').remove();
+            }
+            sendMessage(true);
+        };
+
+        async function sendMessage(isRetry = false) {
+            let text = '';
+            if (isRetry) {
+                text = lastUserMessage;
+            } else {
+                text = chatInput.value.trim();
+                if (!text) return;
+                
+                chatInput.value = '';
+                appendMessage(text, 'user');
+                chatHistory.push({ role: 'user', content: text });
+                lastUserMessage = text;
+            }
             
-            chatInput.value = '';
-            appendMessage(text, 'user');
-            chatHistory.push({ role: 'user', content: text });
             chatTyping.style.display = 'block';
             chatBody.scrollTop = chatBody.scrollHeight;
 
@@ -1266,7 +1282,7 @@
                             const parsed = JSON.parse(jsonStr);
 
                             if (parsed.error) {
-                                botMsgDiv.innerHTML = `<span style="color: #ef4444;">Error: ${parsed.error}</span>`;
+                                throw new Error(parsed.error);
                             } else if (parsed.text) {
                                 replyText += parsed.text;
                                 // Reemplazar formato básico de negritas y saltos de línea para el stream en vivo
@@ -1279,7 +1295,9 @@
                                 finalSuggestedNorms = parsed.suggestedNorms;
                             }
                         } catch (e) {
-                            // Ignorar errores parciales de JSON
+                            if (e.message && !e.message.startsWith('Unexpected token')) {
+                                throw e; // Lanzar errores reales del servidor/IA para ir al catch
+                            }
                         }
                     }
                 }
@@ -1293,7 +1311,30 @@
             } catch (err) {
                 console.error("Detalle del error del chat:", err);
                 chatTyping.style.display = 'none';
-                appendMessage("Lo siento, hubo un error al conectar con el servidor.", 'bot');
+                
+                // Renderizar tarjeta estética de error
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'chat-msg bot error-state';
+                errorDiv.style.borderColor = '#ef4444';
+                errorDiv.style.borderWidth = '1px';
+                errorDiv.style.borderStyle = 'solid';
+                errorDiv.style.background = 'rgba(239, 68, 68, 0.05)';
+                errorDiv.style.padding = '15px';
+                errorDiv.style.borderRadius = '15px';
+                errorDiv.style.marginTop = '10px';
+                errorDiv.innerHTML = `
+                    <p style="color: #f87171; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                        ⚠️ <strong>Error de conexión</strong>
+                    </p>
+                    <p style="margin: 0 0 12px 0; font-size: 0.9em; color: var(--text-muted); line-height: 1.4;">
+                        No se pudo conectar con Burocracio. Los motores de inteligencia artificial están experimentando una alta latencia o fuera de servicio.
+                    </p>
+                    <button class="chat-suggest-btn" style="border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.1); padding: 6px 12px; font-size: 0.85em;" onclick="retryLastMessage(this)">
+                        🔄 Reintentar consulta
+                    </button>
+                `;
+                chatBody.insertBefore(errorDiv, chatTyping);
+                chatBody.scrollTop = chatBody.scrollHeight;
             }
         }
 
