@@ -96,7 +96,7 @@ export default async function handler(req, res) {
           FROM normas n
           JOIN normas_fts f ON n.id = f.id
           WHERE normas_fts MATCH ?
-          ORDER BY f.rank LIMIT 4
+          ORDER BY f.rank LIMIT 10
         `;
         const normasRows = await tursoQuery(searchSql, [keywords]);
         
