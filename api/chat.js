@@ -2,6 +2,26 @@
 let dsFailures = 0;
 let dsTrippedUntil = 0; // Timestamp en ms
 
+// Diccionario de sinónimos jurídicos
+const SINONIMOS = {
+  'exencion': ['exencion', 'exenciones', 'eximicion', 'eximiciones', 'exento', 'exenta', 'exentos', 'eximir'],
+  'tasa': ['tasa', 'tasas', 'tributo', 'tributos', 'gravamen', 'gravamenes', 'derecho', 'derechos'],
+  'obra': ['obra', 'obras', 'construccion', 'construcciones', 'edificacion', 'edificaciones', 'refaccion'],
+  'multa': ['multa', 'multas', 'sancion', 'sanciones', 'infraccion', 'infracciones', 'penalidad'],
+  'poda': ['poda', 'podas', 'arbol', 'arboles', 'forestacion', 'desrame', 'tala', 'verde']
+};
+
+function expandirSinonimos(word) {
+  const clean = word.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  if (!clean) return `"${word}"*`;
+  for (const [key, list] of Object.entries(SINONIMOS)) {
+    if (clean === key || list.some(item => item.normalize("NFD").replace(/[\u0300-\u036f]/g, "") === clean)) {
+      return `(${list.map(term => `"${term}"*`).join(' OR ')})`;
+    }
+  }
+  return `"${word}"*`;
+}
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -91,7 +111,7 @@ export default async function handler(req, res) {
     const stopWords = new Set(['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con', 'en', 'y', 'o', 'a', 'al', 'su', 'sus', 'te', 'tu', 'mi', 'se', 'lo', 'le']);
     const words = message.toLowerCase().replace(/[^a-záéíóúñü\s0-9]/g, '').split(/\s+/);
     const relevantWords = words.filter(w => w.length >= 3 && !stopWords.has(w));
-    const keywords = relevantWords.map(w => `"${w}"*`).join(' OR ');
+    const keywords = relevantWords.map(w => expandirSinonimos(w)).join(' OR ');
 
     if (keywords.length > 0) {
       try {

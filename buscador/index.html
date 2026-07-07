@@ -907,8 +907,11 @@
                 </select>
             </div>
 
-            <div class="stats">
+            <div class="stats" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
                 <div>Normas encontradas: <span id="count-filtered">0</span></div>
+                <button id="btn-informe" class="chat-suggest-btn" style="width: 100%; justify-content: center; padding: 10px; border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.1); color: #c084fc; font-weight: bold; display: none;" onclick="abrirConfiguracionInforme()">
+                    ✨ Informe Temático
+                </button>
             </div>
         </aside>
 
@@ -996,15 +999,24 @@
                 renderCards(lastNormas);
                 
                 totalPages = data.totalPages || 1;
-                countFiltered.textContent = data.total || 0;
+                const totalCount = data.total || 0;
+                countFiltered.textContent = totalCount;
                 pageIndicator.textContent = `Página ${currentPage} de ${totalPages}`;
                 
                 btnPrev.disabled = currentPage === 1;
                 btnNext.disabled = currentPage >= totalPages;
 
+                // Mostrar botón de informe temático si hay normas encontradas
+                const btnInforme = document.getElementById('btn-informe');
+                if (btnInforme) {
+                    btnInforme.style.display = totalCount > 0 ? 'flex' : 'none';
+                }
+
             } catch (error) {
                 console.error("Error consultando la API de Turso:", error);
                 cardsContainer.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 40px;">Error al conectar con la base de datos de Turso Cloud.</p>';
+                const btnInforme = document.getElementById('btn-informe');
+                if (btnInforme) btnInforme.style.display = 'none';
             }
         }
 
@@ -1430,6 +1442,208 @@
 
         chatSend.addEventListener('click', sendMessage);
         chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+        // --- ORQUESTACIÓN DEL MODO INFORME TEMÁTICO ---
+        let currentReportQuery = '';
+        let generatedReportMarkdown = '';
+
+        window.abrirConfiguracionInforme = function() {
+            const searchBox = document.getElementById('search-box');
+            const queryInput = document.getElementById('report-query');
+            
+            // Sugerir la consulta de búsqueda actual
+            queryInput.value = searchBox.value.trim() || 'Exenciones impositivas y de tasas';
+            
+            document.getElementById('report-setup-view').style.display = 'block';
+            document.getElementById('report-progress-view').style.display = 'none';
+            document.getElementById('report-result-view').style.display = 'none';
+            
+            document.getElementById('report-modal').style.display = 'block';
+            document.getElementById('report-overlay').style.display = 'block';
+        };
+
+        window.cerrarReporte = function() {
+            document.getElementById('report-modal').style.display = 'none';
+            document.getElementById('report-overlay').style.display = 'none';
+        };
+
+        window.comenzarInforme = async function() {
+            const query = document.getElementById('report-query').value.trim();
+            if (!query) {
+                alert("Por favor, ingresa el tema para el informe.");
+                return;
+            }
+            
+            currentReportQuery = query;
+            
+            const setupView = document.getElementById('report-setup-view');
+            const progressView = document.getElementById('report-progress-view');
+            const statusText = document.getElementById('report-progress-status');
+            const progressBar = document.getElementById('report-progress-bar');
+            
+            setupView.style.display = 'none';
+            progressView.style.display = 'block';
+            
+            statusText.textContent = "Buscando todas las normas coincidentes en Turso...";
+            progressBar.style.width = '0%';
+
+            // Capturar filtros actuales para buscar
+            const tipo = tipoFilter.value;
+            const categoria = categoriaFilter.value;
+            const anio = anioFilter.value;
+            const vigencia = vigenciaFilter.value;
+            
+            let searchUrl = `/api/buscar-todo?query=${encodeURIComponent(query)}`;
+            if (tipo !== 'todos') searchUrl += `&tipo=${encodeURIComponent(tipo)}`;
+            if (categoria !== 'todas') searchUrl += `&categoria=${encodeURIComponent(categoria)}`;
+            if (anio !== 'todos') searchUrl += `&anio=${encodeURIComponent(anio)}`;
+            if (vigencia !== 'todos') searchUrl += `&vigencia=${encodeURIComponent(vigencia)}`;
+
+            try {
+                // 1. Buscar todas las normas aplicables (ids de a montones)
+                const searchResp = await fetch(searchUrl);
+                if (!searchResp.ok) throw new Error("Error obteniendo el listado de normas.");
+                const searchData = await searchResp.json();
+                
+                const normas = searchData.normas || [];
+                if (normas.length === 0) {
+                    statusText.textContent = "No se encontraron normas para este tema en el Digesto.";
+                    return;
+                }
+                
+                const totalNormas = normas.length;
+                statusText.textContent = `Encontradas ${totalNormas} normas. Iniciando análisis en lotes de 25...`;
+                progressBar.style.width = '5%';
+                
+                const ids = normas.map(n => n.id);
+                const batchSize = 25;
+                let todosLosExtractos = [];
+                
+                // 2. Loop de análisis en lotes
+                for (let i = 0; i < ids.length; i += batchSize) {
+                    const chunk = ids.slice(i, i + batchSize);
+                    const loteNumero = Math.floor(i / batchSize) + 1;
+                    const totalLotes = Math.ceil(ids.length / batchSize);
+                    
+                    statusText.innerHTML = `Analizando lote <strong>${loteNumero} de ${totalLotes}</strong> (${Math.min(i + batchSize, totalNormas)} de ${totalNormas} normas)...<br><span style="font-size:0.85em;color:var(--text-muted);">Aprovechando caché resumen_ia de Turso</span>`;
+                    
+                    const batchResp = await fetch('/api/analizar-lote', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: chunk, query })
+                    });
+                    
+                    if (!batchResp.ok) throw new Error(`Fallo en el lote ${loteNumero}`);
+                    
+                    const batchData = await batchResp.json();
+                    if (batchData.resultados) {
+                        todosLosExtractos = todosLosExtractos.concat(batchData.resultados);
+                    }
+                    
+                    // Actualizar barra
+                    const porcentaje = 5 + Math.round(((i + chunk.length) / totalNormas) * 80);
+                    progressBar.style.width = `${porcentaje}%`;
+                }
+
+                // 3. Sintetizar informe final
+                statusText.innerHTML = "Redactando informe ejecutivo consolidado en Markdown... 🖋️";
+                progressBar.style.width = '95%';
+                
+                const synthResp = await fetch('/api/sintetizar-informe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, extractos: todosLosExtractos })
+                });
+                
+                if (!synthResp.ok) throw new Error("Fallo al sintetizar el informe final.");
+                const synthData = await synthResp.json();
+                
+                generatedReportMarkdown = synthData.informe || '';
+                
+                progressBar.style.width = '100%';
+                
+                // Mostrar resultado
+                progressView.style.display = 'none';
+                const resultView = document.getElementById('report-result-view');
+                resultView.style.display = 'flex';
+                
+                const contentBox = document.getElementById('report-content-box');
+                contentBox.textContent = generatedReportMarkdown;
+                
+            } catch (err) {
+                console.error(err);
+                statusText.innerHTML = `<span style="color:#ef4444;">⚠️ Error en el proceso: ${err.message}</span>`;
+            }
+        };
+
+        window.copiarReporte = function() {
+            navigator.clipboard.writeText(generatedReportMarkdown);
+            alert("¡Informe copiado al portapapeles! 📋");
+        };
+
+        window.descargarReporte = function() {
+            const blob = new Blob([generatedReportMarkdown], { type: 'text/markdown;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Informe_Tematico_${currentReportQuery.replace(/\s+/g, '_')}.md`;
+            link.click();
+        };
     </script>
+
+    <!-- Modal de Informe Temático -->
+    <div id="report-modal" class="chat-panel" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 700px; height: 80vh; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); background: var(--bg-card); backdrop-filter: blur(10px); border-radius: 20px;">
+        <div class="chat-header">
+            <span>Generador de Informe Temático ✨</span>
+            <span class="chat-close" onclick="cerrarReporte()">&times;</span>
+        </div>
+        <div class="chat-body" style="padding: 20px; overflow-y: auto; height: calc(100% - 60px); display: flex; flex-direction: column; gap: 20px;">
+            <!-- Vista de Configuración / Inicio -->
+            <div id="report-setup-view">
+                <h3 style="color: white; margin-top: 0; font-size: 1.25em;">Generar síntesis jurídica sobre el tema activo</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 20px;">
+                    Esta herramienta buscará <strong>todas</strong> las normas de la base de datos que coincidan con la búsqueda actual, las analizará en lotes usando IA (aprovechando la caché de resúmenes) y redactará un informe ejecutivo consolidado en Markdown.
+                </p>
+                <div class="filter-group" style="margin-top: 15px;">
+                    <label style="color: white; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 8px;">Tema del Informe:</label>
+                    <input type="text" id="report-query" class="search-input" style="width: 100%; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" placeholder="Ej: exenciones impositivas a jubilados">
+                </div>
+                <button class="chat-suggest-btn" style="margin-top: 25px; width: 100%; padding: 12px; font-weight: bold; background: var(--primary); color: white; border: none; justify-content: center; font-size: 0.95em;" onclick="comenzarInforme()">
+                    Comenzar Análisis
+                </button>
+            </div>
+            
+            <!-- Vista de Progreso -->
+            <div id="report-progress-view" style="display: none; text-align: center; padding: 40px 0;">
+                <h3 style="color: white; margin-top: 0;">Analizando normativas...</h3>
+                <p id="report-progress-status" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px; min-height: 50px; line-height: 1.5;">
+                    Buscando normas coincidentes...
+                </p>
+                <!-- Barra de progreso -->
+                <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 25px;">
+                    <div id="report-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), #c084fc); transition: width 0.3s ease;"></div>
+                </div>
+                <div class="loading-dots" style="color: var(--text-muted); font-size: 0.8em;">Por favor, no cierres esta ventana. Este proceso no tiene límite de tiempo y no consumirá recursos de tu servidor.</div>
+            </div>
+
+            <!-- Vista del Informe Final -->
+            <div id="report-result-view" style="display: none; flex-direction: column; gap: 15px; height: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;">
+                    <h3 style="color: white; margin: 0; font-size: 1.2em;">Informe Generado</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="chat-suggest-btn" onclick="copiarReporte()" style="border-color: var(--primary); color: white; background: rgba(99,102,241,0.1); padding: 5px 10px;">
+                            📋 Copiar
+                        </button>
+                        <button class="chat-suggest-btn" onclick="descargarReporte()" style="border-color: #10b981; color: white; background: rgba(16,185,129,0.1); padding: 5px 10px;">
+                            💾 Descargar
+                        </button>
+                    </div>
+                </div>
+                <div id="report-content-box" class="preview-text" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; overflow-y: auto; flex-grow: 1; color: white; font-family: monospace; white-space: pre-wrap; font-size: 0.9em; height: 45vh; text-align: left;">
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Overlay del modal -->
+    <div id="report-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 999;" onclick="cerrarReporte()"></div>
 </body>
 </html>

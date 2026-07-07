@@ -172,6 +172,28 @@ export default async function handler(req, res) {
   }
 }
 
+// Diccionario de sinónimos jurídicos y términos frecuentes en el Digesto de Alta Gracia
+const SINONIMOS = {
+  'exencion': ['exencion', 'exenciones', 'eximicion', 'eximiciones', 'exento', 'exenta', 'exentos', 'eximir'],
+  'tasa': ['tasa', 'tasas', 'tributo', 'tributos', 'gravamen', 'gravamenes', 'derecho', 'derechos'],
+  'obra': ['obra', 'obras', 'construccion', 'construcciones', 'edificacion', 'edificaciones', 'refaccion'],
+  'multa': ['multa', 'multas', 'sancion', 'sanciones', 'infraccion', 'infracciones', 'penalidad'],
+  'poda': ['poda', 'podas', 'arbol', 'arboles', 'forestacion', 'desrame', 'tala', 'verde']
+};
+
+function expandirSinonimos(word) {
+  // Limpiar acentos y pasar a minúsculas
+  const clean = word.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  if (!clean) return `"${word}"*`;
+
+  for (const [key, list] of Object.entries(SINONIMOS)) {
+    if (clean === key || list.some(item => item.normalize("NFD").replace(/[\u0300-\u036f]/g, "") === clean)) {
+      return `(${list.map(term => `"${term}"*`).join(' OR ')})`;
+    }
+  }
+  return `"${word}"*`;
+}
+
 // Función auxiliar para formatear la query a la sintaxis MATCH de SQLite FTS5
 function parseFtsQuery(q) {
   if (!q) return "";
@@ -183,14 +205,15 @@ function parseFtsQuery(q) {
   const parsedTokens = tokens.map(token => {
     if (token.startsWith('-')) {
       const term = token.substring(1).replace(/[^a-zA-Z0-9áéíóúñü]/g, "");
-      return term ? `NOT ${term}` : "";
+      return term ? `NOT "${term}"*` : "";
     }
     if (token.startsWith('"') && token.endsWith('"')) {
       const cleanInner = token.slice(1, -1).replace(/["']/g, "");
       return cleanInner ? `"${cleanInner}"` : "";
     }
-    const cleanWord = token.replace(/[^a-zA-Z0-9áéíóúñü*]/g, "");
-    return cleanWord;
+    const cleanWord = token.replace(/[^a-zA-Z0-9áéíóúñü]/g, "");
+    if (!cleanWord || cleanWord.length < 3) return "";
+    return expandirSinonimos(cleanWord);
   }).filter(Boolean);
   
   let result = "";
