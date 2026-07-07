@@ -21,10 +21,10 @@ headers = {
 
 payload = {
     "requests": [
-        {"type": "execute", "stmt": {"sql": "CREATE INDEX IF NOT EXISTS idx_normas_num_tipo ON normas(numero, tipo_nombre)", "args": []}},
+        {"type": "execute", "stmt": {"sql": "ALTER TABLE normas ADD COLUMN resumen_ia_hash TEXT", "args": []}},
         {"type": "close"}
     ]
 }
 
 r = requests.post(f"{TURSO_URL}/v2/pipeline", headers=headers, json=payload)
-print("CREATE INDEX RESPONSE:", r.text)
+print("ALTER TABLE RESPONSE:", r.text)

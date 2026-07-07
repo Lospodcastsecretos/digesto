@@ -154,8 +154,8 @@ Tu respuesta (como asistente jurídico del municipio):`;
     'Access-Control-Allow-Origin': '*'
   });
 
-  const groqKey = process.env.GROQ_API_KEY || "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";
-  const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
+  const groqKey = process.env.GROQ_API_KEY;
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
 
   async function streamOpenAI(url, apiKey, bodyData) {
     const resp = await fetch(url, {

@@ -113,8 +113,8 @@ ${textToSummarize.substring(0, 15000)}
 
 Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues introducciones formales, saludos ni firmas. Ve directo al grano en formato de resumen jurídico útil para el ciudadano.`;
 
-      const groqKey = process.env.GROQ_API_KEY || "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";
-      const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
+      const groqKey = process.env.GROQ_API_KEY;
+      const deepseekKey = process.env.DEEPSEEK_API_KEY;
       let resumenGenerado = '';
       let activeModel = 'DeepSeek (Principal)';
       const isDsTripped = Date.now() < dsTrippedUntil;
@@ -247,8 +247,8 @@ ${normasContext ? `NORMAS:\n${normasContext}` : ''}
 Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
     }
 
-    const groqKey = process.env.GROQ_API_KEY || "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";
-    const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
+    const groqKey = process.env.GROQ_API_KEY;
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
     let resumen = 'No se pudo generar el resumen.';
 
     const isDsTrippedGeneral = Date.now() < dsTrippedUntil;
