@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -78,7 +80,7 @@ export default async function handler(req, res) {
     // CASO NUEVO: Resumir norma individual con caché persistente
     if (normaId) {
       const rows = await tursoQuery(
-        "SELECT id, numero, titulo, resumen, tipo_nombre, texto_completo, resumen_ia FROM normas WHERE id = ?",
+        "SELECT id, numero, titulo, resumen, tipo_nombre, texto_completo, resumen_ia, resumen_ia_hash FROM normas WHERE id = ?",
         [normaId]
       );
       if (rows.length === 0) {
@@ -87,15 +89,16 @@ export default async function handler(req, res) {
       }
       
       const norma = rows[0];
+      const textToSummarize = norma.texto_completo || norma.resumen || norma.titulo || "Sin texto disponible.";
       
-      // Si el resumen de IA ya existe en Turso, lo devolvemos al instante
-      if (norma.resumen_ia && norma.resumen_ia.trim().length > 10) {
+      // Calcular hash MD5 del texto fuente actual
+      const currentHash = crypto.createHash('md5').update(textToSummarize).digest('hex');
+      
+      // Si el resumen de IA ya existe en Turso y el hash coincide, usar el caché
+      if (norma.resumen_ia && norma.resumen_ia_hash === currentHash && norma.resumen_ia.trim().length > 10) {
         res.status(200).json({ resumen: norma.resumen_ia, cached: true, modelo: 'Caché Turso Cloud' });
         return;
-      }
-      
-      // Si no existe, generarlo con IA
-      const textToSummarize = norma.texto_completo || norma.resumen || norma.titulo || "Sin texto disponible.";
+      };
       const promptNorma = `Eres un analista jurídico experto en normativas municipales de Alta Gracia.
 Genera un resumen ejecutivo extremadamente breve, claro y conciso (máximo de 1 a 2 párrafos cortos, un total de 100 palabras) de la siguiente norma municipal:
 Norma: ${norma.tipo_nombre} N° ${norma.numero}
@@ -148,10 +151,10 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
         activeModel = 'Groq (Respaldo)';
       }
 
-      // Guardar el resumen generado en la columna resumen_ia de Turso
+      // Guardar el resumen generado y su hash en la columna resumen_ia de Turso
       await tursoQuery(
-        "UPDATE normas SET resumen_ia = ? WHERE id = ?",
-        [resumenGenerado, normaId]
+        "UPDATE normas SET resumen_ia = ?, resumen_ia_hash = ? WHERE id = ?",
+        [resumenGenerado, currentHash, normaId]
       );
 
       res.status(200).json({ resumen: resumenGenerado, cached: false, modelo: activeModel });
