@@ -926,13 +926,13 @@
             </div>
         </section>
         <!-- Chatbot UI -->
-        <div class="chat-btn" id="chat-toggle">
+        <div class="chat-btn" id="chat-toggle" tabindex="0" role="button" aria-label="Abrir asistente virtual Burocracio">
             <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
         </div>
-        <div class="chat-panel" id="chat-panel">
+        <div class="chat-panel" id="chat-panel" role="dialog" aria-label="Panel de chat con Burocracio">
             <div class="chat-header">
                 <span>Burocracio</span>
-                <span class="chat-close" id="chat-close">&times;</span>
+                <span class="chat-close" id="chat-close" tabindex="0" role="button" aria-label="Cerrar asistente">&times;</span>
             </div>
             <div class="chat-body" id="chat-body">
                 <div class="chat-msg bot">¡Hola! Soy Burocracio, el asistente virtual del Digesto. Pregúntame sobre cualquier ordenanza o normativa y la buscaré para ti.</div>
@@ -941,8 +941,8 @@
             <!-- Adjuntos activos -->
             <div class="chat-attached-area" id="chat-attached-area"></div>
             <div class="chat-input-area">
-                <input type="text" class="chat-input" id="chat-input" placeholder="Ej: ¿Qué dice la ordenanza sobre poda?">
-                <button class="chat-send" id="chat-send">
+                <input type="text" class="chat-input" id="chat-input" placeholder="Ej: ¿Qué dice la ordenanza sobre poda?" aria-label="Mensaje para Burocracio">
+                <button class="chat-send" id="chat-send" aria-label="Enviar mensaje">
                     <svg style="width:16px;height:16px;fill:white;" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                 </button>
             </div>
@@ -1130,8 +1130,29 @@
         // Cargar normas ancladas desde sessionStorage si existen
         let attachedNorms = JSON.parse(sessionStorage.getItem('attachedNorms') || '[]'); 
 
-        chatToggle.addEventListener('click', () => chatPanel.classList.add('active'));
-        chatClose.addEventListener('click', () => chatPanel.classList.remove('active'));
+        chatToggle.addEventListener('click', () => {
+            chatPanel.classList.add('active');
+            chatInput.focus();
+        });
+        chatToggle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                chatPanel.classList.add('active');
+                chatInput.focus();
+            }
+        });
+
+        chatClose.addEventListener('click', () => {
+            chatPanel.classList.remove('active');
+            chatToggle.focus();
+        });
+        chatClose.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                chatPanel.classList.remove('active');
+                chatToggle.focus();
+            }
+        });
 
         // Funciones para adjuntar/desadjuntar normas
         window.attachNorm = function(id, tipo_nombre, numero, titulo) {
