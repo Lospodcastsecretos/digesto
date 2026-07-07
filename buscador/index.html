@@ -824,6 +824,17 @@
         .chat-send { background: var(--primary); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: background 0.2s; }
         .chat-send:hover { background: var(--secondary); }
         .chat-typing { font-size: 0.8rem; color: var(--text-muted); font-style: italic; align-self: flex-start; display: none; }
+        
+        /* Contenedor de adjuntos activos arriba del input */
+        .chat-attached-area { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 15px; border-top: 1px dashed var(--border-color); background: rgba(0,0,0,0.3); display: none; }
+        .chat-attached-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(99, 102, 241, 0.2); border: 1px solid var(--primary); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: white; }
+        .chat-attached-pill-remove { cursor: pointer; color: #fb7185; font-weight: bold; font-size: 0.85rem; }
+        .chat-attached-pill-remove:hover { color: #f43f5e; }
+
+        /* Píldoras de sugerencias debajo del mensaje de la IA */
+        .chat-msg-suggestions { display: flex; flex-wrap: wrap; gap: 8px; align-self: flex-start; margin-top: -8px; margin-bottom: 5px; max-width: 85%; }
+        .chat-suggest-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.15); border-radius: 15px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .chat-suggest-btn:hover { background: rgba(99, 102, 241, 0.15); border-color: var(--primary); color: white; transform: translateY(-1px); }
     </style>
 </head>
 <body>
@@ -927,6 +938,8 @@
                 <div class="chat-msg bot">¡Hola! Soy Burocracio, el asistente virtual del Digesto. Pregúntame sobre cualquier ordenanza o normativa y la buscaré para ti.</div>
                 <div class="chat-typing" id="chat-typing">Escribiendo...</div>
             </div>
+            <!-- Adjuntos activos -->
+            <div class="chat-attached-area" id="chat-attached-area"></div>
             <div class="chat-input-area">
                 <input type="text" class="chat-input" id="chat-input" placeholder="Ej: ¿Qué dice la ordenanza sobre poda?">
                 <button class="chat-send" id="chat-send">
@@ -1111,12 +1124,51 @@
         const chatSend = document.getElementById('chat-send');
         const chatBody = document.getElementById('chat-body');
         const chatTyping = document.getElementById('chat-typing');
+        const chatAttachedArea = document.getElementById('chat-attached-area');
+        
         let chatHistory = [];
+        let attachedNorms = []; // Guardar objetos { id, numero, tipo_nombre, titulo }
 
         chatToggle.addEventListener('click', () => chatPanel.classList.add('active'));
         chatClose.addEventListener('click', () => chatPanel.classList.remove('active'));
 
-        function appendMessage(text, sender) {
+        // Funciones para adjuntar/desadjuntar normas
+        window.attachNorm = function(id, tipo_nombre, numero, titulo) {
+            // Evitar duplicados
+            if (attachedNorms.some(n => n.id === id)) return;
+            
+            attachedNorms.push({ id, numero, tipo_nombre, titulo });
+            updateAttachedArea();
+            
+            // Auto scroll del chat por si se achica el cuerpo
+            chatBody.scrollTop = chatBody.scrollHeight;
+        };
+
+        window.removeAttachedNorm = function(id) {
+            attachedNorms = attachedNorms.filter(n => n.id !== id);
+            updateAttachedArea();
+        };
+
+        function updateAttachedArea() {
+            chatAttachedArea.innerHTML = '';
+            if (attachedNorms.length === 0) {
+                chatAttachedArea.style.display = 'none';
+                return;
+            }
+            
+            chatAttachedArea.style.display = 'flex';
+            attachedNorms.forEach(n => {
+                const pill = document.createElement('div');
+                pill.className = 'chat-attached-pill';
+                pill.innerHTML = `
+                    📎 ${n.tipo_nombre.substring(0, 3)}. ${n.numero}
+                    <span class="chat-attached-pill-remove" onclick="removeAttachedNorm(${n.id})">&times;</span>
+                `;
+                chatAttachedArea.appendChild(pill);
+            });
+        }
+
+        function appendMessage(text, sender, suggestedNorms = []) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `chat-msg ${sender}`;
             if (sender === 'bot') {
@@ -1125,6 +1177,26 @@
                 msgDiv.textContent = text;
             }
             chatBody.insertBefore(msgDiv, chatTyping);
+
+            // Renderizar píldoras de sugerencias si vienen normas
+            if (sender === 'bot' && suggestedNorms && suggestedNorms.length > 0) {
+                const suggDiv = document.createElement('div');
+                suggDiv.className = 'chat-msg-suggestions';
+                
+                suggestedNorms.forEach(n => {
+                    // Escapar posibles comillas en el título
+                    const escapedTitle = (n.titulo || '').replace(/'/g, "\\'");
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'chat-suggest-btn';
+                    btn.innerHTML = `📎 Adjuntar ${n.tipo_nombre} ${n.numero}`;
+                    btn.onclick = () => window.attachNorm(n.id, n.tipo_nombre, n.numero, escapedTitle);
+                    suggDiv.appendChild(btn);
+                });
+                
+                chatBody.insertBefore(suggDiv, chatTyping);
+            }
+
             chatBody.scrollTop = chatBody.scrollHeight;
         }
 
@@ -1138,17 +1210,23 @@
             chatTyping.style.display = 'block';
             chatBody.scrollTop = chatBody.scrollHeight;
 
+            const attachedIds = attachedNorms.map(n => n.id);
+
             try {
                 const resp = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, history: chatHistory })
+                    body: JSON.stringify({ 
+                        message: text, 
+                        history: chatHistory,
+                        attachedNormIds: attachedIds
+                    })
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error || 'Error en backend');
                 
                 chatTyping.style.display = 'none';
-                appendMessage(data.reply, 'bot');
+                appendMessage(data.reply, 'bot', data.suggestedNorms);
                 chatHistory.push({ role: 'bot', content: data.reply });
             } catch (err) {
                 console.error("Detalle del error del chat:", err);

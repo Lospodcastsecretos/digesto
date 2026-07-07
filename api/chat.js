@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   const cleanUrl = url.replace("libsql://", "https://").replace("http://", "https://");
   const pipelineUrl = `${cleanUrl}/v2/pipeline`;
 
-  const { message, history } = req.body;
+  const { message, history, attachedNormIds } = req.body;
   if (!message) {
     res.status(400).json({ error: "Mensaje vacío" });
     return;
@@ -56,39 +56,61 @@ export default async function handler(req, res) {
     });
   }
 
-  // 1. Extraer palabras clave de la pregunta para buscar en Turso
-  const stopWords = new Set(['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con', 'en', 'y', 'o', 'a', 'al', 'su', 'sus', 'te', 'tu', 'mi', 'se', 'lo', 'le']);
-  const words = message.toLowerCase().replace(/[^a-záéíóúñü\s0-9]/g, '').split(/\s+/);
-  
-  // Mantener palabras de >= 3 letras que no sean stop words
-  const relevantWords = words.filter(w => w.length >= 3 && !stopWords.has(w));
-  
-  // Agregar wildcard '*' a cada palabra y unirlas con OR para máxima flexibilidad en FTS5
-  const keywords = relevantWords.map(w => `"${w}"*`).join(' OR ');
-
   let contextText = "No se encontraron normas específicas relacionadas con la pregunta actual.";
+  let suggestedNorms = [];
 
-  // 2. Buscar en Turso si hay keywords (RAG)
-  if (keywords.length > 0) {
+  // Modo 1: El usuario adjuntó normas específicas para hablar sobre ellas
+  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
     try {
-      // Buscar en FTS5 las 4 normas mas relevantes (incluyendo texto completo)
+      const placeholders = attachedNormIds.map(() => '?').join(',');
       const searchSql = `
-        SELECT n.id, n.numero, n.titulo, n.resumen, n.tipo_nombre, n.fecha, n.texto_completo
-        FROM normas n
-        JOIN normas_fts f ON n.id = f.id
-        WHERE normas_fts MATCH ?
-        ORDER BY f.rank LIMIT 4
+        SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
+        FROM normas 
+        WHERE id IN (${placeholders})
       `;
-      const normasRows = await tursoQuery(searchSql, [keywords]);
+      const normasRows = await tursoQuery(searchSql, attachedNormIds);
       
       if (normasRows.length > 0) {
-        contextText = normasRows.map(n => {
+        contextText = "[NIVEL DE ATENCIÓN MÁXIMO] El ciudadano ha adjuntado las siguientes normas específicas para conversar sobre ellas:\n\n" + 
+        normasRows.map(n => {
           const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
           return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
         }).join("\n\n---\n\n");
+
+        suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
       }
     } catch (e) {
-      console.error("Error buscando contexto RAG:", e);
+      console.error("Error buscando normas adjuntas:", e);
+    }
+  } else {
+    // Modo 2: Búsqueda tradicional FTS5 por palabras clave (RAG)
+    const stopWords = new Set(['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con', 'en', 'y', 'o', 'a', 'al', 'su', 'sus', 'te', 'tu', 'mi', 'se', 'lo', 'le']);
+    const words = message.toLowerCase().replace(/[^a-záéíóúñü\s0-9]/g, '').split(/\s+/);
+    const relevantWords = words.filter(w => w.length >= 3 && !stopWords.has(w));
+    const keywords = relevantWords.map(w => `"${w}"*`).join(' OR ');
+
+    if (keywords.length > 0) {
+      try {
+        const searchSql = `
+          SELECT n.id, n.numero, n.titulo, n.resumen, n.tipo_nombre, n.fecha, n.texto_completo
+          FROM normas n
+          JOIN normas_fts f ON n.id = f.id
+          WHERE normas_fts MATCH ?
+          ORDER BY f.rank LIMIT 4
+        `;
+        const normasRows = await tursoQuery(searchSql, [keywords]);
+        
+        if (normasRows.length > 0) {
+          contextText = normasRows.map(n => {
+            const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
+            return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
+          }).join("\n\n---\n\n");
+
+          suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
+        }
+      } catch (e) {
+        console.error("Error buscando contexto RAG:", e);
+      }
     }
   }
 
@@ -179,5 +201,5 @@ Tu respuesta (como asistente jurídico del municipio):`;
     }
   }
 
-  res.status(200).json({ reply });
+  res.status(200).json({ reply, suggestedNorms });
 }
