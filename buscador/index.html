@@ -1134,18 +1134,17 @@
 
         // Funciones para adjuntar/desadjuntar normas
         window.attachNorm = function(id, tipo_nombre, numero, titulo) {
-            // Evitar duplicados
-            if (attachedNorms.some(n => n.id === id)) return;
+            // Evitar duplicados forzando comparación a String
+            if (attachedNorms.some(n => String(n.id) === String(id))) return;
             
             attachedNorms.push({ id, numero, tipo_nombre, titulo });
             updateAttachedArea();
-            
-            // Auto scroll del chat por si se achica el cuerpo
             chatBody.scrollTop = chatBody.scrollHeight;
         };
 
         window.removeAttachedNorm = function(id) {
-            attachedNorms = attachedNorms.filter(n => n.id !== id);
+            // Filtrar forzando comparación a String
+            attachedNorms = attachedNorms.filter(n => String(n.id) !== String(id));
             updateAttachedArea();
         };
 
