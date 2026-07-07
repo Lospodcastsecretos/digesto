@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+// Variables globales del Circuit Breaker (en memoria del contenedor warm de Vercel)
+let dsFailures = 0;
+let dsTrippedUntil = 0; // Timestamp en ms
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -112,9 +116,14 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
       const groqKey = process.env.GROQ_API_KEY || "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";
       const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
       let resumenGenerado = '';
-      let activeModel = '';
+      let activeModel = 'DeepSeek (Principal)';
+      const isDsTripped = Date.now() < dsTrippedUntil;
 
       try {
+        if (isDsTripped) {
+          throw new Error("DeepSeek Circuit Breaker activado");
+        }
+
         // Intentar con DeepSeek
         const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
           method: "POST",
@@ -129,11 +138,20 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
         if (dsResp.ok) {
           const data = await dsResp.json();
           resumenGenerado = data.choices[0].message.content;
-          activeModel = 'DeepSeek (Principal)';
+          dsFailures = 0; // Éxito
         } else {
           throw new Error("DeepSeek falló");
         }
       } catch (err) {
+        if (!isDsTripped) {
+          dsFailures++;
+          if (dsFailures >= 3) {
+            dsTrippedUntil = Date.now() + 5 * 60 * 1000; // Bloquear DeepSeek por 5 minutos
+          }
+        }
+        
+        activeModel = 'Groq (Respaldo)';
+        
         // Fallback a Groq
         const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -148,7 +166,6 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
         if (!groqResp.ok) throw new Error("Ambos motores fallaron al intentar resumir.");
         const data = await groqResp.json();
         resumenGenerado = data.choices[0].message.content;
-        activeModel = 'Groq (Respaldo)';
       }
 
       // Guardar el resumen generado y su hash en la columna resumen_ia de Turso
@@ -234,7 +251,13 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
     const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
     let resumen = 'No se pudo generar el resumen.';
 
+    const isDsTrippedGeneral = Date.now() < dsTrippedUntil;
+
     try {
+      if (isDsTrippedGeneral) {
+        throw new Error("DeepSeek Circuit Breaker activado");
+      }
+
       // Intento 1: DeepSeek
       const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
@@ -250,12 +273,20 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
       if (dsResp.ok) {
         const data = await dsResp.json();
         resumen = data.choices[0].message.content;
+        dsFailures = 0; // Éxito
         res.status(200).json({ resumen, modelo: 'DeepSeek (Principal)' });
         return;
       } else {
         throw new Error("Fallo DeepSeek");
       }
     } catch (errDeepSeek) {
+      if (!isDsTrippedGeneral) {
+        dsFailures++;
+        if (dsFailures >= 3) {
+          dsTrippedUntil = Date.now() + 5 * 60 * 1000;
+        }
+      }
+
       try {
         // Intento 2: Groq
         const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {

@@ -1332,6 +1332,7 @@
                 const botMsgDiv = appendMessage('', 'bot');
                 let replyText = '';
                 let finalSuggestedNorms = [];
+                let activeProvider = '';
                 let buffer = '';
 
                 const reader = resp.body.getReader();
@@ -1365,6 +1366,9 @@
                                 chatBody.scrollTop = chatBody.scrollHeight;
                             } else if (parsed.suggestedNorms) {
                                 finalSuggestedNorms = parsed.suggestedNorms;
+                                if (parsed.provider) {
+                                    activeProvider = parsed.provider;
+                                }
                             }
                         } catch (e) {
                             if (e.message && !e.message.startsWith('Unexpected token')) {
@@ -1372,6 +1376,20 @@
                             }
                         }
                     }
+                }
+
+                // Si se usó motor de respaldo (Groq), renderizar aviso sutil de calidad
+                if (activeProvider && activeProvider.includes('Groq')) {
+                    const fallbackAlert = document.createElement('div');
+                    fallbackAlert.style.fontSize = '0.75em';
+                    fallbackAlert.style.color = 'var(--text-muted)';
+                    fallbackAlert.style.marginTop = '12px';
+                    fallbackAlert.style.opacity = '0.75';
+                    fallbackAlert.style.borderTop = '1px dashed rgba(255,255,255,0.05)';
+                    fallbackAlert.style.paddingTop = '6px';
+                    fallbackAlert.innerHTML = `⚠️ <em>Respuesta generada con motor de respaldo (Groq). El nivel de detalle puede variar.</em>`;
+                    botMsgDiv.appendChild(fallbackAlert);
+                    chatBody.scrollTop = chatBody.scrollHeight;
                 }
 
                 // Renderizar sugerencias al final

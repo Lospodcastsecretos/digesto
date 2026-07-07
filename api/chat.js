@@ -1,3 +1,7 @@
+// Variables globales del Circuit Breaker (en memoria del contenedor warm de Vercel)
+let dsFailures = 0;
+let dsTrippedUntil = 0; // Timestamp en ms
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -199,7 +203,15 @@ Tu respuesta (como asistente jurídico del municipio):`;
     }
   }
 
+  let activeProvider = 'DeepSeek (Principal)';
+  const isDsTripped = Date.now() < dsTrippedUntil;
+
   try {
+    if (isDsTripped) {
+      console.warn("Circuit Breaker activado para DeepSeek. Saltando directo a Groq...");
+      throw new Error("DeepSeek Circuit Breaker activado");
+    }
+
     // Intento 1: DeepSeek Streaming
     await streamOpenAI("https://api.deepseek.com/chat/completions", deepseekKey, {
       model: "deepseek-chat",
@@ -210,8 +222,22 @@ Tu respuesta (como asistente jurídico del municipio):`;
       temperature: 0.2,
       max_tokens: 1500
     });
+    
+    // Si tiene éxito, resetear contador de fallos
+    dsFailures = 0;
   } catch (errDeepSeek) {
-    console.warn("Fallo DeepSeek Stream, intentando con Groq...", errDeepSeek.message);
+    if (!isDsTripped) {
+      dsFailures++;
+      console.warn(`Fallo DeepSeek Stream (${dsFailures}/3). Error:`, errDeepSeek.message);
+      if (dsFailures >= 3) {
+        // Activar disyuntor por 5 minutos
+        dsTrippedUntil = Date.now() + 5 * 60 * 1000;
+        console.error("-> CIRCUIT BREAKER ACTIVADO: DeepSeek falló 3 veces. Se usará Groq por los próximos 5 minutos.");
+      }
+    }
+    
+    activeProvider = 'Groq (Respaldo)';
+    
     try {
       // Intento 2: Fallback Groq Streaming
       await streamOpenAI("https://api.groq.com/openai/v1/chat/completions", groqKey, {
@@ -226,10 +252,11 @@ Tu respuesta (como asistente jurídico del municipio):`;
     } catch (errGroq) {
       console.error("Error en API de Chat Multi-IA (Groq falló también):", errGroq);
       res.write(`data: ${JSON.stringify({ error: "No se pudo conectar con los proveedores de IA: " + errGroq.message })}\n\n`);
+      activeProvider = 'Ninguno (Fallo)';
     }
   }
 
-  // Enviar las sugerencias de normas y finalizar la conexión
-  res.write(`data: ${JSON.stringify({ suggestedNorms })}\n\n`);
+  // Enviar las sugerencias de normas, el proveedor y finalizar la conexión
+  res.write(`data: ${JSON.stringify({ suggestedNorms, provider: activeProvider })}\n\n`);
   res.end();
 }
