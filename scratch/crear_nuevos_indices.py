@@ -31,7 +31,7 @@ def run_query(sql):
         {"type": "close"}
       ]
     }
-    r = requests.post(url, headers=headers, json=payload, timeout=30)
+    r = requests.post(url, headers=headers, json=payload, timeout=180)
     if not r.ok:
         raise Exception(f"HTTP {r.status_code}: {r.text}")
     data = r.json()
