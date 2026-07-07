@@ -1057,12 +1057,18 @@
                             <button class="btn-preview" onclick="togglePreview(${item.id})">
                                 Vista Previa Texto
                             </button>
+                            <button class="btn-preview" style="background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); color: #c084fc;" onclick="resumirNormaIA(${item.id})" id="btn-resumir-${item.id}">
+                                Resumen IA ✨
+                            </button>
                             <a href="${fileUrl}" target="_blank" class="btn-download ${hasFile ? '' : 'disabled'}">
                                 Descargar
                             </a>
                         </div>
                     </div>
                     ${previewHtml}
+                    <div class="preview-container" id="resumen-ia-${item.id}">
+                        <div class="preview-text" id="resumen-ia-text-${item.id}">Generando resumen impositivo con IA...</div>
+                    </div>
                 `;
                 cardsContainer.appendChild(card);
             });
@@ -1070,9 +1076,54 @@
 
         // Alternar vista previa
         window.togglePreview = function(id) {
+            // Cerrar resumen IA si está abierto para evitar amontonamiento
+            const resumen = document.getElementById(`resumen-ia-${id}`);
+            if (resumen) resumen.classList.remove('active');
+            
             const preview = document.getElementById(`preview-${id}`);
             if (preview) {
                 preview.classList.toggle('active');
+            }
+        };
+
+        // Generar y cachear resumen IA
+        window.resumirNormaIA = async function(id) {
+            // Cerrar vista previa de texto si está abierta
+            const preview = document.getElementById(`preview-${id}`);
+            if (preview) preview.classList.remove('active');
+            
+            const container = document.getElementById(`resumen-ia-${id}`);
+            const textDiv = document.getElementById(`resumen-ia-text-${id}`);
+            
+            if (container.classList.contains('active')) {
+                container.classList.remove('active');
+                return;
+            }
+            
+            container.classList.add('active');
+            textDiv.innerHTML = '<span style="color: var(--text-muted);">Cargando resumen desde Turso o generando con IA... ⏳</span>';
+            
+            try {
+                const resp = await fetch('/api/resumen-ia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ normaId: id, query: 'resumen_individual' })
+                });
+                
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Error al obtener resumen');
+                
+                const cacheInfo = data.cached ? '⚡ (Cargado desde caché)' : '🤖 (Generado ahora)';
+                textDiv.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-size: 0.8em; color: var(--text-muted);">
+                        <span>${cacheInfo}</span>
+                        <span>Modelo: ${data.modelo}</span>
+                    </div>
+                    <p style="margin: 0; line-height: 1.5; color: white;">${data.resumen.replace(/\n/g, '<br>')}</p>
+                `;
+            } catch (err) {
+                console.error(err);
+                textDiv.innerHTML = `<span style="color: #ef4444;">⚠️ Error: ${err.message}</span>`;
             }
         };
 
