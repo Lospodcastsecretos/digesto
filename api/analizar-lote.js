@@ -55,7 +55,11 @@ export default async function handler(req, res) {
     });
   }
 
-  const { ids, query } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
+  }
+  const { ids, query } = body || {};
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     res.status(400).json({ error: "Se requiere un array de IDs a analizar." });

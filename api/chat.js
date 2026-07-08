@@ -45,7 +45,11 @@ export default async function handler(req, res) {
   const cleanUrl = url.replace("libsql://", "https://").replace("http://", "https://");
   const pipelineUrl = `${cleanUrl}/v2/pipeline`;
 
-  const { message, history, attachedNormIds } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
+  }
+  const { message, history, attachedNormIds } = body || {};
   if (!message) {
     res.status(400).json({ error: "Mensaje vacío" });
     return;

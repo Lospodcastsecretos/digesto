@@ -18,7 +18,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { extractos, query } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
+  }
+  const { extractos, query } = body || {};
 
   if (!extractos || !Array.isArray(extractos)) {
     res.status(400).json({ error: "Se requiere la lista de extractos para sintetizar." });
