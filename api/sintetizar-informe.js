@@ -66,8 +66,6 @@ REGLAS DE ESTILO:
 - Destaca con negritas los números de Ordenanza (ej. **Ordenanza N° 1234**) y beneficiarios clave.
 - Ve directo al grano sin introducciones del tipo "Aquí tienes tu informe...".`;
 
-  const groqKey = process.env.GROQ_API_KEY || "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";
-  const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
 
   let informeSintesis = '';
   let activeModel = 'DeepSeek (Principal)';

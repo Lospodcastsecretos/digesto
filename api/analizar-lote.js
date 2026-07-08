@@ -72,8 +72,6 @@ export default async function handler(req, res) {
 
     // 2. Asegurar que todas las normas tengan un resumen_ia listo
     const normasConResumen = [];
-    const groqKey = process.env.GROQ_API_KEY || "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";
-    const deepseekKey = process.env.DEEPSEEK_API_KEY || "sk-854124346ef84affbb67479c276b2554";
 
     for (const norma of rows) {
       const textToSummarize = norma.texto_completo || norma.resumen || norma.titulo || "Sin texto.";
