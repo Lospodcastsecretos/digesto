@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   // Leer tokens desde las variables de entorno de Vercel
   const url = process.env.TURSO_URL;
   const authToken = process.env.TURSO_TOKEN;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
 
   if (!url || !authToken) {
     res.status(500).json({ error: "Faltan las variables de entorno de conexión a Turso (TURSO_URL o TURSO_TOKEN)." });
@@ -33,41 +34,10 @@ export default async function handler(req, res) {
   const offset = (currentPage - 1) * itemsPerPage;
 
   try {
-    let sql = "SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle FROM normas WHERE 1=1";
+    let sql = "";
     const params = [];
-
-    if (query) {
-      sql += " AND id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?)";
-      params.push(parseFtsQuery(query));
-    }
-
-    if (tipo && tipo !== 'todos') {
-      sql += " AND tipo_nombre = ?";
-      params.push(tipo);
-    }
-
-    if (categoria && categoria !== 'todas') {
-      sql += " AND categoria_nombre = ?";
-      params.push(categoria);
-    }
-
-    if (anio && anio !== 'todos') {
-      sql += " AND fecha = ?";
-      params.push(`Año ${anio}`);
-    }
-
-    if (vigencia && vigencia !== 'todos') {
-      const isVigente = vigencia === 'si' ? 1 : 0;
-      sql += " AND vigente = ?";
-      params.push(isVigente);
-    }
-
-    // Clonar sql y params para el conteo total
-    let countSql = sql.replace("SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle FROM normas", "SELECT COUNT(*) as total FROM normas");
-
-    // Construir la consulta paginada
-    let paginatedSql = sql + " ORDER BY id DESC LIMIT ? OFFSET ?";
-    const paginatedParams = [...params, itemsPerPage, offset];
+    let countSql = "";
+    const countParams = [];
 
     // Helper para formatear argumentos para el endpoint pipeline de Turso
     const formatArgs = (args) => {
@@ -75,9 +45,111 @@ export default async function handler(req, res) {
         if (typeof arg === 'number') {
           return { type: 'integer', value: arg.toString() };
         }
-        return { type: 'text', value: arg.toString() };
+        if (arg && typeof arg === 'object' && arg.type === 'blob') {
+          return arg; // Pasar blob directamente
+        }
+        return { type: 'text', value: arg ? arg.toString() : '' };
       });
     };
+
+    // Si hay una consulta de búsqueda, intentamos búsqueda híbrida
+    let queryVectorStr = null;
+    if (query && query.trim() && openAiApiKey) {
+      try {
+        // Llamada directa a los embeddings de OpenAI
+        const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openAiApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            input: query.trim(),
+            model: "text-embedding-3-small"
+          })
+        });
+
+        if (openAiResp.ok) {
+          const openAiData = await openAiResp.json();
+          const vector = openAiData.data[0].embedding;
+          queryVectorStr = JSON.stringify(vector);
+        } else {
+          console.warn("Fallo al obtener embeddings de OpenAI. Usando FTS sintáctico como fallback.");
+        }
+      } catch (err) {
+        console.error("Error obteniendo embeddings de OpenAI:", err);
+      }
+    }
+
+    // Filtros de metadatos comunes
+    let filterSql = "";
+    const filterParams = [];
+
+    if (tipo && tipo !== 'todos') {
+      filterSql += " AND tipo_nombre = ?";
+      filterParams.push(tipo);
+    }
+    if (categoria && categoria !== 'todas') {
+      filterSql += " AND categoria_nombre = ?";
+      filterParams.push(categoria);
+    }
+    if (anio && anio !== 'todos') {
+      filterSql += " AND fecha = ?";
+      filterParams.push(`Año ${anio}`);
+    }
+    if (vigencia && vigencia !== 'todos') {
+      const isVigente = vigencia === 'si' ? 1 : 0;
+      filterSql += " AND vigente = ?";
+      filterParams.push(isVigente);
+    }
+
+    if (queryVectorStr) {
+      // BÚSQUEDA HÍBRIDA (FTS5 + Vectorial)
+      // fts_score: 1.0 si coincide exactamente con FTS, 0.0 si no.
+      // vector_score: similitud de cosenos normalizada (1.0 - distancia)
+      sql = `
+        SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
+               (1.0 - vector_distance_cos(embedding, vector(?))) AS vector_score,
+               (CASE WHEN id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) THEN 1.0 ELSE 0.0 END) AS fts_score
+        FROM normas
+        WHERE embedding IS NOT NULL ${filterSql}
+        ORDER BY (fts_score * 0.6 + vector_score * 0.4) DESC
+        LIMIT ? OFFSET ?
+      `;
+      params.push(queryVectorStr, parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
+
+      // Consulta de conteo para búsqueda vectorial
+      countSql = `SELECT COUNT(*) as total FROM normas WHERE embedding IS NOT NULL ${filterSql}`;
+      countParams.push(...filterParams);
+    } else if (query) {
+      // FALLBACK: Búsqueda sintáctica FTS5 tradicional
+      sql = `
+        SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
+               0.0 AS vector_score, 1.0 AS fts_score
+        FROM normas
+        WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) ${filterSql}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+      `;
+      params.push(parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
+
+      countSql = `SELECT COUNT(*) as total FROM normas WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) ${filterSql}`;
+      countParams.push(parseFtsQuery(query), ...filterParams);
+    } else {
+      // SIN CONSULTA: Listar de forma tradicional
+      sql = `
+        SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
+               0.0 AS vector_score, 0.0 AS fts_score
+        FROM normas
+        WHERE 1=1 ${filterSql}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+      `;
+      params.push(...filterParams, itemsPerPage, offset);
+
+      countSql = `SELECT COUNT(*) as total FROM normas WHERE 1=1 ${filterSql}`;
+      countParams.push(...filterParams);
+    }
 
     // Ejecutar ambas consultas en un batch (pipeline) de Turso para máxima velocidad
     const requestBody = {
@@ -86,14 +158,14 @@ export default async function handler(req, res) {
           type: "execute",
           stmt: {
             sql: countSql,
-            args: formatArgs(params)
+            args: formatArgs(countParams)
           }
         },
         {
           type: "execute",
           stmt: {
-            sql: paginatedSql,
-            args: formatArgs(paginatedParams)
+            sql: sql,
+            args: formatArgs(params)
           }
         },
         {
@@ -145,6 +217,17 @@ export default async function handler(req, res) {
         item[colName] = valObj ? valObj.value : null;
       });
 
+      // Calcular porcentaje de relevancia
+      let relevancia = null;
+      if (queryVectorStr) {
+        const vScore = parseFloat(item.vector_score) || 0;
+        const fScore = parseFloat(item.fts_score) || 0;
+        // Ajustamos la relevancia para que se vea amigable en la interfaz (escala 0-100)
+        // La similitud de coseno en text-embedding-3-small suele rondar entre 0.1 y 0.7 para textos legales
+        const normalizedVector = Math.min(Math.max((vScore - 0.15) / 0.55, 0), 1);
+        relevancia = Math.round((fScore * 0.5 + normalizedVector * 0.5) * 100);
+      }
+
       return {
         id: item.id ? parseInt(item.id) : null,
         numero: item.numero,
@@ -155,7 +238,8 @@ export default async function handler(req, res) {
         vigente: item.vigente === '1' || item.vigente === 1,
         fecha: item.fecha,
         archivo_pdf: item.archivo_pdf,
-        url_detalle: item.url_detalle
+        url_detalle: item.url_detalle,
+        relevancia: relevancia
       };
     });
 
