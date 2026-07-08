@@ -51,7 +51,9 @@ export default async function handler(req, res) {
   }
   const { message, history, attachedNormIds } = body || {};
   if (!message) {
-    res.status(400).json({ error: "Mensaje vacío" });
+    res.status(400).json({ 
+      error: `Mensaje vacío. Body: ${JSON.stringify(body)}. Typeof req.body: ${typeof req.body}. Content-Type: ${req.headers['content-type']}` 
+    });
     return;
   }
 
