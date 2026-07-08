@@ -1429,7 +1429,7 @@
                         ⚠️ <strong>Error de conexión</strong>
                     </p>
                     <p style="margin: 0 0 12px 0; font-size: 0.9em; color: var(--text-muted); line-height: 1.4;">
-                        No se pudo conectar con Burocracio. Los motores de inteligencia artificial están experimentando una alta latencia o fuera de servicio.
+                        No se pudo conectar con Burocracio. Detalle técnico: <strong>${err.message || err.toString()}</strong>
                     </p>
                     <button class="chat-suggest-btn" style="border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.1); padding: 6px 12px; font-size: 0.85em;" onclick="retryLastMessage(this)">
                         🔄 Reintentar consulta
