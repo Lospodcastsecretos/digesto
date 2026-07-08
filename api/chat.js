@@ -196,11 +196,15 @@ Tu respuesta (como asistente jurídico del municipio):`;
       throw new Error(`Status ${resp.status}: ${errText}`);
     }
 
+    const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
-    for await (const chunk of resp.body) {
-      buffer += decoder.decode(chunk, { stream: true });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
 
@@ -217,7 +221,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
               res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
             }
           } catch (err) {
-            // Ignorar errores parciales de JSON
+            // Ignorar
           }
         }
       }
