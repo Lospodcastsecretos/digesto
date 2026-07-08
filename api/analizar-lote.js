@@ -14,9 +14,10 @@ export default async function handler(req, res) {
 
   const url = process.env.TURSO_URL;
   const authToken = process.env.TURSO_TOKEN;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
 
-  if (!geminiKey || !url || !authToken) {
+  if (!url || !authToken || (!deepseekKey && !groqKey)) {
     res.status(500).json({ error: "Faltan variables de entorno esenciales en Vercel." });
     return;
   }
@@ -109,7 +110,7 @@ Texto: ${textToSummarize.substring(0, 12000)}`;
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
             body: JSON.stringify({
-              model: "llama3-8b-8192",
+              model: "llama-3.1-8b-instant",
               messages: [{ role: "user", content: promptNorma }],
               temperature: 0.2,
               max_tokens: 500
@@ -196,7 +197,7 @@ ${contextText}`;
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({
-          model: "llama3-8b-8192",
+          model: "llama-3.1-8b-instant",
           messages: [{ role: "user", content: promptBatch }],
           temperature: 0.1,
           max_tokens: 3500

@@ -10,9 +10,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    res.status(500).json({ error: "Faltan variables de entorno esenciales." });
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if ((!deepseekKey && !groqKey)) {
+    res.status(500).json({ error: "Faltan variables de entorno esenciales para IA." });
     return;
   }
 
@@ -100,10 +102,10 @@ REGLAS DE ESTILO:
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [{ role: "user", content: promptSintesis }],
-        temperature: 0.3,
-        max_tokens: 3000
+            model: "llama-3.1-8b-instant",
+            messages: [{ role: "user", content: promptSintesis }],
+            temperature: 0.3,
+            max_tokens: 3000
       })
     });
     if (!groqResp.ok) throw new Error("Ambas IAs fallaron al sintetizar el informe.");

@@ -262,7 +262,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
     try {
       // Intento 2: Fallback Groq Streaming
       await streamOpenAI("https://api.groq.com/openai/v1/chat/completions", groqKey, {
-        model: "llama3-8b-8192",
+        model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message }

@@ -158,7 +158,7 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
           body: JSON.stringify({
-            model: "llama3-8b-8192",
+            model: "llama-3.1-8b-instant",
             messages: [{ role: "user", content: promptNorma }],
             temperature: 0.2,
             max_tokens: 800
@@ -294,7 +294,7 @@ Genera un resumen muy breve en 2 párrafos cortos sobre el tema.`;
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
           body: JSON.stringify({
-            model: "llama3-8b-8192",
+            model: "llama-3.1-8b-instant",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3,
             max_tokens: 3000
