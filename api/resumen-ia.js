@@ -13,12 +13,13 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
   const url = process.env.TURSO_URL;
   const authToken = process.env.TURSO_TOKEN;
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
 
-  if (!geminiKey || !url || !authToken) {
-    res.status(500).json({ error: "Faltan variables de entorno esenciales (GEMINI_API_KEY, TURSO_URL o TURSO_TOKEN)." });
+  if (!url || !authToken || (!deepseekKey && !groqKey)) {
+    res.status(500).json({ error: "Faltan variables de entorno esenciales (TURSO_URL, TURSO_TOKEN, DEEPSEEK_API_KEY o GROQ_API_KEY)." });
     return;
   }
 

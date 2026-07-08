@@ -34,10 +34,11 @@ export default async function handler(req, res) {
 
   const url = process.env.TURSO_URL;
   const authToken = process.env.TURSO_TOKEN;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
 
-  if (!url || !authToken || !geminiKey) {
-    res.status(500).json({ error: "Faltan variables de entorno." });
+  if (!url || !authToken || (!deepseekKey && !groqKey)) {
+    res.status(500).json({ error: "Faltan variables de entorno esenciales (TURSO_URL, TURSO_TOKEN, DEEPSEEK_API_KEY o GROQ_API_KEY)." });
     return;
   }
 
