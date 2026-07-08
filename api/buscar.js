@@ -52,9 +52,20 @@ export default async function handler(req, res) {
       });
     };
 
+    // Helper para empaquetar el vector como Float32 Little-Endian en Base64
+    const packVector = (arr) => {
+      const buffer = new ArrayBuffer(arr.length * 4);
+      const view = new DataView(buffer);
+      arr.forEach((val, i) => {
+        view.setFloat32(i * 4, val, true); // true = little endian
+      });
+      // En Node.js podemos convertir un ArrayBuffer a Buffer y luego a base64
+      return Buffer.from(buffer).toString('base64');
+    };
+
     // Si hay una consulta de búsqueda, intentamos búsqueda híbrida
-    let queryVectorStr = null;
-    if (query && query.trim() && openAiApiKey) {
+    let queryVectorBlob = null; // Desactivado temporalmente para liberar la CPU de Turso
+    if (false && query && query.trim() && openAiApiKey) {
       try {
         // Llamada directa a los embeddings de OpenAI
         const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
@@ -72,7 +83,7 @@ export default async function handler(req, res) {
         if (openAiResp.ok) {
           const openAiData = await openAiResp.json();
           const vector = openAiData.data[0].embedding;
-          queryVectorStr = JSON.stringify(vector);
+          queryVectorBlob = { type: 'blob', base64: packVector(vector) };
         } else {
           console.warn("Fallo al obtener embeddings de OpenAI. Usando FTS sintáctico como fallback.");
         }
@@ -103,20 +114,20 @@ export default async function handler(req, res) {
       filterParams.push(isVigente);
     }
 
-    if (queryVectorStr) {
+    if (queryVectorBlob) {
       // BÚSQUEDA HÍBRIDA (FTS5 + Vectorial)
       // fts_score: 1.0 si coincide exactamente con FTS, 0.0 si no.
       // vector_score: similitud de cosenos normalizada (1.0 - distancia)
       sql = `
         SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
-               (1.0 - vector_distance_cos(embedding, vector(?))) AS vector_score,
+               (1.0 - vector_distance_cos(embedding, ?)) AS vector_score,
                (CASE WHEN id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) THEN 1.0 ELSE 0.0 END) AS fts_score
         FROM normas
         WHERE embedding IS NOT NULL ${filterSql}
         ORDER BY (fts_score * 0.6 + vector_score * 0.4) DESC
         LIMIT ? OFFSET ?
       `;
-      params.push(queryVectorStr, parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
+      params.push(queryVectorBlob, parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
 
       // Consulta de conteo para búsqueda vectorial
       countSql = `SELECT COUNT(*) as total FROM normas WHERE embedding IS NOT NULL ${filterSql}`;
@@ -219,7 +230,7 @@ export default async function handler(req, res) {
 
       // Calcular porcentaje de relevancia
       let relevancia = null;
-      if (queryVectorStr) {
+      if (queryVectorBlob) {
         const vScore = parseFloat(item.vector_score) || 0;
         const fScore = parseFloat(item.fts_score) || 0;
         // Ajustamos la relevancia para que se vea amigable en la interfaz (escala 0-100)
