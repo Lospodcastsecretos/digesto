@@ -1318,6 +1318,9 @@
             }
             
             chatTyping.style.display = 'block';
+            chatInput.disabled = true;
+            chatSend.disabled = true;
+            chatSend.style.opacity = '0.5';
             chatBody.scrollTop = chatBody.scrollHeight;
 
             const attachedIds = attachedNorms.map(n => n.id);
@@ -1438,6 +1441,11 @@
                 `;
                 chatBody.insertBefore(errorDiv, chatTyping);
                 chatBody.scrollTop = chatBody.scrollHeight;
+            } finally {
+                chatInput.disabled = false;
+                chatSend.disabled = false;
+                chatSend.style.opacity = '1';
+                chatInput.focus();
             }
         }
 
