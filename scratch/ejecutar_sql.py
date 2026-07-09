@@ -38,32 +38,38 @@ def ejecutar_sql(sql):
         "Content-Type": "application/json"
     }
     
-    try:
-        r = requests.post(pipeline_url, headers=headers, json=payload, timeout=30)
-        r.raise_for_status()
-        res = r.json()
-        
-        if res["results"][0]["type"] == "error":
-            print(f"❌ Error de Turso: {res['results'][0]['error']['message']}")
-            return
+    for attempt in range(3):
+        try:
+            r = requests.post(pipeline_url, headers=headers, json=payload, timeout=90)
+            r.raise_for_status()
+            res = r.json()
             
-        result = res["results"][0]["response"]["result"]
-        print("✅ Comando SQL ejecutado con éxito.")
-        if "affected_row_count" in result:
-            print(f"   Filas afectadas: {result['affected_row_count']}")
-            
-        # Si devuelve filas (es un SELECT), imprimirlas
-        if "cols" in result and result.get("rows"):
-            cols = [c["name"] for c in result["cols"]]
-            print(f"\nResultados ({len(result['rows'])} filas):")
-            print(" | ".join(cols))
-            print("-" * 40)
-            for r_val in result["rows"]:
-                vals = [str(v.get("value") if isinstance(v, dict) else v) for v in r_val]
-                print(" | ".join(vals))
+            if res["results"][0]["type"] == "error":
+                print(f"❌ Error de Turso: {res['results'][0]['error']['message']}")
+                return
                 
-    except Exception as e:
-        print(f"❌ Error de red o conexión: {e}")
+            result = res["results"][0]["response"]["result"]
+            print("✅ Comando SQL ejecutado con éxito.")
+            if "affected_row_count" in result:
+                print(f"   Filas afectadas: {result['affected_row_count']}")
+                
+            # Si devuelve filas (es un SELECT), imprimirlas
+            if "cols" in result and result.get("rows"):
+                cols = [c["name"] for c in result["cols"]]
+                print(f"\nResultados ({len(result['rows'])} filas):")
+                print(" | ".join(cols))
+                print("-" * 40)
+                for r_val in result["rows"]:
+                    vals = [str(v.get("value") if isinstance(v, dict) else v) for v in r_val]
+                    print(" | ".join(vals))
+            return
+                    
+        except Exception as e:
+            print(f"⚠️ Intento {attempt+1} falló ({e}). Reintentando en 5 segundos...")
+            import time
+            time.sleep(5)
+            
+    print("❌ No se pudo conectar con Turso tras 3 intentos.")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
