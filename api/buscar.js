@@ -63,11 +63,13 @@ export default async function handler(req, res) {
       return Buffer.from(buffer).toString('base64');
     };
 
-    // Si hay una consulta de búsqueda, intentamos búsqueda híbrida
-    let queryVectorBlob = null; // Desactivado temporalmente para liberar la CPU de Turso
-    if (false && query && query.trim() && openAiApiKey) {
+    // Si hay una consulta de búsqueda, intentamos búsqueda híbrida Retrieve & Rank
+    let queryVectorBlob = null;
+    let candidateIds = [];
+
+    if (query && query.trim() && openAiApiKey) {
       try {
-        // Llamada directa a los embeddings de OpenAI
+        // 1. Obtener embedding de la query de OpenAI
         const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
           method: "POST",
           headers: {
@@ -84,11 +86,43 @@ export default async function handler(req, res) {
           const openAiData = await openAiResp.json();
           const vector = openAiData.data[0].embedding;
           queryVectorBlob = { type: 'blob', base64: packVector(vector) };
+
+          // 2. Recuperar candidatos broad (OR) de FTS5
+          const ftsCandidatesQuery = parseFtsCandidatesQuery(query);
+          if (ftsCandidatesQuery) {
+            const candidatesResp = await fetch(pipelineUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                requests: [
+                  {
+                    type: "execute",
+                    stmt: {
+                      sql: "SELECT id FROM normas_fts WHERE normas_fts MATCH ? LIMIT 200",
+                      args: [{ type: "text", value: ftsCandidatesQuery }]
+                    }
+                  },
+                  { type: "close" }
+                ]
+              })
+            });
+
+            if (candidatesResp.ok) {
+              const candidatesData = await candidatesResp.json();
+              if (candidatesData.results && candidatesData.results[0] && candidatesData.results[0].response) {
+                const rows = candidatesData.results[0].response.result.rows;
+                candidateIds = rows.map(r => parseInt(r[0].value)).filter(id => !isNaN(id));
+              }
+            }
+          }
         } else {
           console.warn("Fallo al obtener embeddings de OpenAI. Usando FTS sintáctico como fallback.");
         }
       } catch (err) {
-        console.error("Error obteniendo embeddings de OpenAI:", err);
+        console.error("Error en Retrieve and Rank semántico:", err);
       }
     }
 
@@ -114,24 +148,32 @@ export default async function handler(req, res) {
       filterParams.push(isVigente);
     }
 
-    if (queryVectorBlob) {
-      // BÚSQUEDA HÍBRIDA (FTS5 + Vectorial)
-      // fts_score: 1.0 si coincide exactamente con FTS, 0.0 si no.
-      // vector_score: similitud de cosenos normalizada (1.0 - distancia)
+    if (queryVectorBlob && candidateIds.length > 0) {
+      // BÚSQUEDA HÍBRIDA: RETRIEVE & RANK (Súper optimizada para evitar CPU/Timeouts en Turso)
+      const idPlaceholders = candidateIds.map(() => "?").join(", ");
+      
       sql = `
         SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
                (1.0 - vector_distance_cos(embedding, ?)) AS vector_score,
                (CASE WHEN id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) THEN 1.0 ELSE 0.0 END) AS fts_score
         FROM normas
-        WHERE embedding IS NOT NULL ${filterSql}
+        WHERE id IN (${idPlaceholders}) ${filterSql}
         ORDER BY (fts_score * 0.6 + vector_score * 0.4) DESC
         LIMIT ? OFFSET ?
       `;
-      params.push(queryVectorBlob, parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
+      
+      params.push(
+        queryVectorBlob, 
+        parseFtsQuery(query),
+        ...candidateIds, 
+        ...filterParams, 
+        itemsPerPage, 
+        offset
+      );
 
-      // Consulta de conteo para búsqueda vectorial
-      countSql = `SELECT COUNT(*) as total FROM normas WHERE embedding IS NOT NULL ${filterSql}`;
-      countParams.push(...filterParams);
+      // Conteo basado exclusivamente en los candidatos
+      countSql = `SELECT COUNT(*) as total FROM normas WHERE id IN (${idPlaceholders}) ${filterSql}`;
+      countParams.push(...candidateIds, ...filterParams);
     } else if (query) {
       // FALLBACK: Búsqueda sintáctica FTS5 tradicional
       sql = `
@@ -329,4 +371,13 @@ function parseFtsQuery(q) {
     }
   }
   return result;
+}
+
+// Función auxiliar para formatear una query amplia para la obtención de candidatos en Retrieve & Rank
+function parseFtsCandidatesQuery(q) {
+  if (!q) return "";
+  const clean = q.replace(/[*\"'\-\+]/g, " ").trim();
+  const words = clean.split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) return "";
+  return words.map(w => `${w}*`).join(" OR ");
 }
