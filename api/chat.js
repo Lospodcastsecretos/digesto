@@ -36,6 +36,7 @@ export default async function handler(req, res) {
   const authToken = process.env.TURSO_TOKEN;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
 
   if (!url || !authToken || (!deepseekKey && !groqKey)) {
     res.status(500).json({ error: "Faltan variables de entorno esenciales (TURSO_URL, TURSO_TOKEN, DEEPSEEK_API_KEY o GROQ_API_KEY)." });
@@ -57,8 +58,19 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Helper para empaquetar el vector como Float32 Little-Endian en Base64
+  const packVector = (arr) => {
+    const buffer = new ArrayBuffer(arr.length * 4);
+    const view = new DataView(buffer);
+    arr.forEach((val, i) => {
+      view.setFloat32(i * 4, val, true);
+    });
+    return Buffer.from(buffer).toString('base64');
+  };
+
   const formatArgs = (args) => args.map(arg => {
     if (typeof arg === 'number') return { type: 'integer', value: arg.toString() };
+    if (arg && typeof arg === 'object' && arg.type === 'blob') return arg;
     return { type: 'text', value: arg.toString() };
   });
 
@@ -77,7 +89,10 @@ export default async function handler(req, res) {
     if (!resp.ok) return [];
     const data = await resp.json();
     const result = data.results[0];
-    if (result.type === 'error') return [];
+    if (result.type === 'error') {
+      console.error("Error en query de Turso Chat:", result.error.message);
+      return [];
+    }
 
     const cols = result.response.result.cols.map(c => c.name);
     return result.response.result.rows.map(row => {
@@ -114,7 +129,7 @@ export default async function handler(req, res) {
       console.error("Error buscando normas adjuntas:", e);
     }
   } else {
-    // Modo 2: Búsqueda tradicional FTS5 por palabras clave (RAG)
+    // Modo 2: Búsqueda RAG Semántica (Retrieve & Rank)
     const stopWords = new Set(['que', 'es', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'para', 'por', 'sobre', 'como', 'con', 'en', 'y', 'o', 'a', 'al', 'su', 'sus', 'te', 'tu', 'mi', 'se', 'lo', 'le']);
     const words = message.toLowerCase().replace(/[^a-záéíóúñü\s0-9]/g, '').split(/\s+/);
     const relevantWords = words.filter(w => w.length >= 3 && !stopWords.has(w));
@@ -122,15 +137,60 @@ export default async function handler(req, res) {
 
     if (keywords.length > 0) {
       try {
-        const searchSql = `
-          SELECT n.id, n.numero, n.titulo, n.resumen, n.tipo_nombre, n.fecha, n.texto_completo
-          FROM normas n
-          JOIN normas_fts f ON n.id = f.id
-          WHERE normas_fts MATCH ?
-          ORDER BY f.rank LIMIT 10
-        `;
-        const normasRows = await tursoQuery(searchSql, [keywords]);
-        
+        let queryVectorBlob = null;
+        let candidateIds = [];
+
+        // 2.1 Obtener embedding de OpenAI para la pregunta del usuario
+        if (openAiApiKey) {
+          try {
+            const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${openAiApiKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                input: message.trim(),
+                model: "text-embedding-3-small"
+              })
+            });
+            if (openAiResp.ok) {
+              const openAiData = await openAiResp.json();
+              queryVectorBlob = { type: 'blob', base64: packVector(openAiData.data[0].embedding) };
+            }
+          } catch (err) {
+            console.error("Error al obtener embedding en Chat:", err);
+          }
+        }
+
+        // 2.2 Obtener candidatos de FTS5
+        const candidates = await tursoQuery("SELECT id FROM normas_fts WHERE normas_fts MATCH ? LIMIT 100", [keywords]);
+        candidateIds = candidates.map(c => parseInt(c.id)).filter(id => !isNaN(id));
+
+        let normasRows = [];
+
+        if (queryVectorBlob && candidateIds.length > 0) {
+          // Búsqueda Semántica Rankeada
+          const placeholders = candidateIds.map(() => '?').join(',');
+          const searchSql = `
+            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo,
+                   (1.0 - vector_distance_cos(embedding, ?)) AS vector_score
+            FROM normas
+            WHERE id IN (${placeholders})
+            ORDER BY vector_score DESC LIMIT 8
+          `;
+          normasRows = await tursoQuery(searchSql, [queryVectorBlob, ...candidateIds]);
+        } else if (candidateIds.length > 0) {
+          // Fallback a sintáctico FTS5 tradicional
+          const placeholders = candidateIds.map(() => '?').join(',');
+          const searchSql = `
+            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
+            FROM normas
+            WHERE id IN (${placeholders}) LIMIT 8
+          `;
+          normasRows = await tursoQuery(searchSql, candidateIds);
+        }
+
         if (normasRows.length > 0) {
           contextText = normasRows.map(n => {
             const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
