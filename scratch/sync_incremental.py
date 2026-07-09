@@ -140,6 +140,70 @@ def descargar_y_convertir_docx(drive_id):
     else:
         raise Exception(f"Error HTTP {resp.status_code} al descargar.")
 
+def descargar_y_convertir_pdf(drive_id):
+    url = f"{SITE_URL}/download/{drive_id}"
+    resp = requests.get(url, headers=digesto_headers, allow_redirects=True, timeout=40, stream=True)
+    if resp.status_code == 200:
+        content_type = resp.headers.get("Content-Type", "")
+        if "html" in content_type:
+            raise Exception("El servidor devolvió HTML en lugar del archivo binario.")
+            
+        temp_pdf_path = "temp_sync_file.pdf"
+        with open(temp_pdf_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=16384):
+                if chunk:
+                    f.write(chunk)
+                    
+        try:
+            # 1. Intentar extracción de texto nativa con pypdf
+            extracted_text = ""
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(temp_pdf_path)
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        extracted_text += text + "\n"
+                extracted_text = extracted_text.strip()
+            except Exception as pe:
+                print(f"      [PDF] Error en extracción nativa (pypdf): {pe}")
+            
+            # Si se logró extraer suficiente texto nativo, usarlo
+            if len(extracted_text) > 150:
+                print(f"      [PDF] Texto nativo extraído con éxito ({len(extracted_text)} caracteres).")
+                return extracted_text
+                
+            # 2. Si no, aplicar OCR con pytesseract y pdf2image
+            print("      [PDF] Poco texto nativo detectado. Aplicando OCR (Tesseract)...")
+            try:
+                from pdf2image import convert_from_path
+                import pytesseract
+                
+                # Convertir páginas del PDF a imágenes en memoria
+                images = convert_from_path(temp_pdf_path)
+                ocr_text = ""
+                for i, img in enumerate(images):
+                    print(f"         [OCR] Procesando página {i+1} de {len(images)}...")
+                    page_text = pytesseract.image_to_string(img, lang="spa")
+                    if page_text:
+                        ocr_text += page_text + "\n"
+                
+                ocr_text = ocr_text.strip()
+                if ocr_text:
+                    print(f"      [PDF] OCR finalizado con éxito ({len(ocr_text)} caracteres).")
+                    return ocr_text
+            except Exception as oe:
+                print(f"      [PDF] Error o dependencias faltantes para OCR (Tesseract/Poppler): {oe}")
+            
+            # Si falló todo, retornar lo que sea que hayamos sacado
+            return extracted_text if extracted_text else "Error: No se pudo extraer texto del PDF escaneado (falta OCR local)."
+            
+        finally:
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+    else:
+        raise Exception(f"Error HTTP {resp.status_code} al descargar.")
+
 def normalizar_publicacion(p):
     """Mapear los nombres de la API del digesto a las columnas de la base de datos."""
     # Determinar tipo
@@ -241,9 +305,18 @@ def main():
             try:
                 drive_id = resolver_drive_id(filename)
                 if drive_id and drive_id != "sin_archivo_fisico":
-                    print(f"   -> Descargando y convirtiendo archivo Word (Drive: {drive_id})...")
-                    texto_completo = descargar_y_convertir_docx(drive_id)
-                    print(f"   ✅ Texto completo extraído: {len(texto_completo)} caracteres.")
+                    ext = os.path.splitext(filename.lower())[1]
+                    if ext == ".docx":
+                        print(f"   -> Descargando y convirtiendo archivo Word (Drive: {drive_id})...")
+                        texto_completo = descargar_y_convertir_docx(drive_id)
+                    elif ext == ".pdf":
+                        print(f"   -> Descargando y convirtiendo archivo PDF (Drive: {drive_id})...")
+                        texto_completo = descargar_y_convertir_pdf(drive_id)
+                    else:
+                        print(f"   ⚠️ Extensión de archivo no soportada: {ext}. Saltando conversión.")
+                    
+                    if texto_completo:
+                        print(f"   ✅ Texto completo extraído: {len(texto_completo)} caracteres.")
                 else:
                     print("   ⚠️ La norma no tiene archivo físico en Google Drive.")
             except Exception as e:
