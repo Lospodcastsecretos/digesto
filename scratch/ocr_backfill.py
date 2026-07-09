@@ -260,8 +260,9 @@ def main():
                 embedding = get_openai_embedding(text_to_embed)
                 
                 # Actualizar base de datos
+                db_text = texto_completo if texto_completo else "sin_texto_disponible"
                 sql_up = "UPDATE normas SET texto_completo = ? WHERE id = ?"
-                turso_query(sql_up, [texto_completo, nid])
+                turso_query(sql_up, [db_text, nid])
                 
                 if embedding:
                     embedding_str = json.dumps(embedding)
