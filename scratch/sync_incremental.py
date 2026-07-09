@@ -64,25 +64,32 @@ def turso_query(sql, args=None):
         ]
     }
     
-    r = requests.post(pipeline_url, headers=turso_headers, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    
-    if data["results"][0]["type"] == "error":
-        raise Exception(f"Turso Error: {data['results'][0]['error']['message']}")
-        
-    result = data["results"][0]["response"]["result"]
-    if "cols" not in result:
-        return []
-        
-    cols = [c["name"] for c in result["cols"]]
-    rows = []
-    for r_val in result.get("rows", []):
-        obj = {}
-        for i, col in enumerate(cols):
-            obj[col] = r_val[i].get("value") if isinstance(r_val[i], dict) else None
-        rows.append(obj)
-    return rows
+    for attempt in range(3):
+        try:
+            r = requests.post(pipeline_url, headers=turso_headers, json=payload, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+            
+            if data["results"][0]["type"] == "error":
+                raise Exception(f"Turso Error: {data['results'][0]['error']['message']}")
+                
+            result = data["results"][0]["response"]["result"]
+            if "cols" not in result:
+                return []
+                
+            cols = [c["name"] for c in result["cols"]]
+            rows = []
+            for r_val in result.get("rows", []):
+                obj = {}
+                for i, col in enumerate(cols):
+                    obj[col] = r_val[i].get("value") if isinstance(r_val[i], dict) else None
+                rows.append(obj)
+            return rows
+        except Exception as e:
+            print(f"      [Turso] Intento {attempt+1} falló ({e}). Reintentando en 5 segundos...")
+            time.sleep(5)
+            
+    raise Exception("❌ No se pudo conectar con Turso tras 3 intentos (Timeout/Error de red).")
 
 def get_openai_embedding(text):
     safe_text = text[:8000]
@@ -106,11 +113,14 @@ def get_openai_embedding(text):
 
 def resolver_drive_id(filename):
     url = f"{SITE_URL}/api/documentos/{filename}"
-    resp = requests.get(url, headers=digesto_headers, timeout=15)
-    if resp.status_code == 200:
-        data = resp.json()
-        if isinstance(data, list) and len(data) > 0:
-            return data[0].get("id")
+    try:
+        resp = requests.get(url, headers=digesto_headers, timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data[0].get("id")
+    except Exception as e:
+        print(f"      [Drive ID] Falló resolución para {filename}: {e}")
     return None
 
 def descargar_y_convertir_docx(drive_id):
