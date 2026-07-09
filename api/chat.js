@@ -156,7 +156,7 @@ export default async function handler(req, res) {
       if (normasRows.length > 0) {
         contextText = "[NIVEL DE ATENCIÓN MÁXIMO] El ciudadano ha adjuntado las siguientes normas específicas para conversar sobre ellas:\n\n" + 
         normasRows.map(n => {
-          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
+          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
           return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
         }).join("\n\n---\n\n");
 
@@ -213,7 +213,7 @@ export default async function handler(req, res) {
                    (1.0 - vector_distance_cos(embedding, ?)) AS vector_score
             FROM normas
             WHERE id IN (${placeholders})
-            ORDER BY vector_score DESC LIMIT 8
+            ORDER BY vector_score DESC LIMIT 5
           `;
           normasRows = await tursoQuery(searchSql, [queryVectorBlob, ...candidateIds]);
         } else if (candidateIds.length > 0) {
@@ -222,14 +222,14 @@ export default async function handler(req, res) {
           const searchSql = `
             SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
             FROM normas
-            WHERE id IN (${placeholders}) LIMIT 8
+            WHERE id IN (${placeholders}) LIMIT 5
           `;
           normasRows = await tursoQuery(searchSql, candidateIds);
         }
 
         if (normasRows.length > 0) {
           contextText = normasRows.map(n => {
-            const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 25000);
+          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
             return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
           }).join("\n\n---\n\n");
 
