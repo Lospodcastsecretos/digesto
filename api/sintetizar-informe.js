@@ -12,8 +12,11 @@ export default async function handler(req, res) {
 
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+  const cacheUrl = process.env.TURSO_CACHE_URL || process.env.TURSO_URL;
+  const cacheAuthToken = process.env.TURSO_CACHE_TOKEN || process.env.TURSO_TOKEN;
 
-  if ((!deepseekKey && !groqKey)) {
+  if (!deepseekKey && !groqKey) {
     res.status(500).json({ error: "Faltan variables de entorno esenciales para IA." });
     return;
   }
@@ -37,6 +40,90 @@ export default async function handler(req, res) {
       informe: `# Informe Temático: ${query}\n\nNo se encontraron normas vigentes o aplicables que traten específicamente sobre este tema en el Digesto.`
     });
     return;
+  }
+
+  // Helper para empaquetar el vector
+  const packVector = (arr) => {
+    const buffer = new ArrayBuffer(arr.length * 4);
+    const view = new DataView(buffer);
+    arr.forEach((val, i) => { view.setFloat32(i * 4, val, true); });
+    return Buffer.from(buffer).toString('base64');
+  };
+
+  const formatArgs = (args) => args.map(arg => {
+    if (typeof arg === 'number') return { type: 'integer', value: arg.toString() };
+    if (arg && typeof arg === 'object' && arg.type === 'blob') return arg;
+    return { type: 'text', value: arg.toString() };
+  });
+
+  // Lógica de caché semántica
+  let queryVectorBlob = null;
+  let cachePipelineUrl = "";
+  if (cacheUrl) {
+    const cleanCacheUrl = cacheUrl.replace("libsql://", "https://").replace("http://", "https://");
+    cachePipelineUrl = `${cleanCacheUrl}/v2/pipeline`;
+  }
+
+  async function tursoCacheQuery(sql, params = []) {
+    if (!cachePipelineUrl) return [];
+    const requestBody = {
+      requests: [
+        { type: "execute", stmt: { sql, args: formatArgs(params) } },
+        { type: "close" }
+      ]
+    };
+    try {
+      const cacheResp = await fetch(cachePipelineUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${cacheAuthToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      if (!cacheResp.ok) return [];
+      const data = await cacheResp.json();
+      const result = data.results[0];
+      if (result.type === 'error') return [];
+
+      const cols = result.response.result.cols.map(c => c.name);
+      return result.response.result.rows.map(row => {
+        const obj = {};
+        cols.forEach((col, i) => { obj[col] = row[i] ? row[i].value : null; });
+        return obj;
+      });
+    } catch (e) {
+      console.error("Fallo al conectar a Turso Cache:", e);
+      return [];
+    }
+  }
+
+  // 1. Obtener embedding de OpenAI para la consulta del informe
+  if (query && query.trim() && openAiApiKey) {
+    try {
+      const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${openAiApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ input: query.trim(), model: "text-embedding-3-small" })
+      });
+      if (openAiResp.ok) {
+        const openAiData = await openAiResp.json();
+        queryVectorBlob = { type: 'blob', base64: packVector(openAiData.data[0].embedding) };
+
+        // 2. Buscar en la caché semántica
+        const cacheRows = await tursoCacheQuery(
+          "SELECT response_text FROM semantic_cache WHERE query_text LIKE 'report:%' AND (1.0 - vector_distance_cos(embedding, ?)) > 0.81 LIMIT 1",
+          [queryVectorBlob]
+        );
+        if (cacheRows.length > 0) {
+          console.log(`[CACHE HIT] Sirviendo informe tematico cacheado para: "${query}"`);
+          res.status(200).json({ 
+            informe: cacheRows[0].response_text, 
+            modelo: "Caché Semántica (Turso)" 
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Error en cache semantica de informes:", err);
+    }
   }
 
   // Formatear los extractos para el contexto del LLM
@@ -69,7 +156,6 @@ REGLAS DE ESTILO:
 - Mantén un tono formal y técnico pero de lectura ágil.
 - Destaca con negritas los números de Ordenanza (ej. **Ordenanza N° 1234**) y beneficiarios clave.
 - Ve directo al grano sin introducciones del tipo "Aquí tienes tu informe...".`;
-
 
   let informeSintesis = '';
   let activeModel = 'DeepSeek (Principal)';
@@ -113,6 +199,19 @@ REGLAS DE ESTILO:
     if (!groqResp.ok) throw new Error("Ambas IAs fallaron al sintetizar el informe.");
     const data = await groqResp.json();
     informeSintesis = data.choices[0].message.content;
+  }
+
+  // Guardar en la caché semántica
+  if (queryVectorBlob && informeSintesis) {
+    try {
+      await tursoCacheQuery(
+        "INSERT OR IGNORE INTO semantic_cache (query_text, embedding, response_text) VALUES (?, ?, ?)",
+        [`report:${query.trim()}`, queryVectorBlob, informeSintesis]
+      );
+      console.log(`[CACHE WRITE] Informe sintetizado guardado en cache semantica para: "${query}"`);
+    } catch (cacheWriteErr) {
+      console.error("Error al guardar informe en cache semantica:", cacheWriteErr);
+    }
   }
 
   res.status(200).json({ informe: informeSintesis, modelo: activeModel });

@@ -37,6 +37,10 @@ export default async function handler(req, res) {
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
   const openAiApiKey = process.env.OPENAI_API_KEY;
+  
+  // Base de datos de caché (con fallback si no está configurada)
+  const cacheUrl = process.env.TURSO_CACHE_URL || url;
+  const cacheAuthToken = process.env.TURSO_CACHE_TOKEN || authToken;
 
   if (!url || !authToken || (!deepseekKey && !groqKey)) {
     res.status(500).json({ error: "Faltan variables de entorno esenciales (TURSO_URL, TURSO_TOKEN, DEEPSEEK_API_KEY o GROQ_API_KEY)." });
@@ -45,6 +49,9 @@ export default async function handler(req, res) {
 
   const cleanUrl = url.replace("libsql://", "https://").replace("http://", "https://");
   const pipelineUrl = `${cleanUrl}/v2/pipeline`;
+  
+  const cleanCacheUrl = cacheUrl.replace("libsql://", "https://").replace("http://", "https://");
+  const cachePipelineUrl = `${cleanCacheUrl}/v2/pipeline`;
 
   let body = req.body;
   if (typeof body === 'string') {
@@ -102,8 +109,38 @@ export default async function handler(req, res) {
     });
   }
 
+  // Helper para interactuar con la base de datos de caché
+  async function tursoCacheQuery(sql, params = []) {
+    const body = {
+      requests: [
+        { type: "execute", stmt: { sql, args: formatArgs(params) } },
+        { type: "close" }
+      ]
+    };
+    const resp = await fetch(cachePipelineUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cacheAuthToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const result = data.results[0];
+    if (result.type === 'error') {
+      console.error("Error en query de Turso Cache:", result.error.message);
+      return [];
+    }
+
+    const cols = result.response.result.cols.map(c => c.name);
+    return result.response.result.rows.map(row => {
+      const obj = {};
+      cols.forEach((col, i) => { obj[col] = row[i] ? row[i].value : null; });
+      return obj;
+    });
+  }
+
   let contextText = "No se encontraron normas específicas relacionadas con la pregunta actual.";
   let suggestedNorms = [];
+  let queryVectorBlob = null;
 
   // Modo 1: El usuario adjuntó normas específicas para hablar sobre ellas
   if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
@@ -137,7 +174,6 @@ export default async function handler(req, res) {
 
     if (keywords.length > 0) {
       try {
-        let queryVectorBlob = null;
         let candidateIds = [];
 
         // 2.1 Obtener embedding de OpenAI para la pregunta del usuario
@@ -241,6 +277,36 @@ Tu respuesta (como asistente jurídico del municipio):`;
     'Access-Control-Allow-Origin': '*'
   });
 
+  // 5. Verificar caché semántica antes de llamar al LLM
+  if (queryVectorBlob && !attachedNormIds?.length) {
+    try {
+      const cacheRows = await tursoCacheQuery(
+        "SELECT response_text FROM semantic_cache WHERE query_text LIKE 'chat:%' AND (1.0 - vector_distance_cos(embedding, ?)) > 0.81 LIMIT 1",
+        [queryVectorBlob]
+      );
+      if (cacheRows.length > 0) {
+        const cachedResponse = cacheRows[0].response_text;
+        console.log(`[CACHE HIT] Respondiendo desde la cache semantica de Turso.`);
+        
+        // Simular un ligero streaming para una experiencia de usuario natural
+        const words = cachedResponse.split(" ");
+        for (let i = 0; i < words.length; i++) {
+          const chunk = words[i] + (i < words.length - 1 ? " " : "");
+          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          // Pequeña pausa cada 4 palabras
+          if (i % 4 === 0) {
+            await new Promise(r => setTimeout(r, 20));
+          }
+        }
+        
+        res.write(`data: ${JSON.stringify({ suggestedNorms, provider: "Caché Semántica (Turso)" })}\n\n`);
+        res.end();
+        return;
+      }
+    } catch (cacheErr) {
+      console.error("Error leyendo cache semantica:", cacheErr);
+    }
+  }
 
   async function streamOpenAI(url, apiKey, bodyData) {
     const resp = await fetch(url, {
@@ -263,6 +329,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let fullText = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -282,6 +349,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
             const parsed = JSON.parse(jsonStr);
             const delta = parsed.choices[0].delta?.content || '';
             if (delta) {
+              fullText += delta;
               res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
             }
           } catch (err) {
@@ -290,10 +358,12 @@ Tu respuesta (como asistente jurídico del municipio):`;
         }
       }
     }
+    return fullText;
   }
 
   let activeProvider = 'DeepSeek (Principal)';
   const isDsTripped = Date.now() < dsTrippedUntil;
+  let llmResponse = "";
 
   try {
     if (isDsTripped) {
@@ -302,7 +372,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
     }
 
     // Intento 1: DeepSeek Streaming
-    await streamOpenAI("https://api.deepseek.com/chat/completions", deepseekKey, {
+    llmResponse = await streamOpenAI("https://api.deepseek.com/chat/completions", deepseekKey, {
       model: "deepseek-chat",
       messages: [
         { role: "system", content: systemPrompt },
@@ -329,7 +399,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
     
     try {
       // Intento 2: Fallback Groq Streaming
-      await streamOpenAI("https://api.groq.com/openai/v1/chat/completions", groqKey, {
+      llmResponse = await streamOpenAI("https://api.groq.com/openai/v1/chat/completions", groqKey, {
         model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: systemPrompt },
@@ -342,6 +412,19 @@ Tu respuesta (como asistente jurídico del municipio):`;
       console.error("Error en API de Chat Multi-IA (Groq falló también):", errGroq);
       res.write(`data: ${JSON.stringify({ error: "No se pudo conectar con los proveedores de IA: " + errGroq.message })}\n\n`);
       activeProvider = 'Ninguno (Fallo)';
+    }
+  }
+
+  // Guardar en caché semántica si obtuvimos respuesta exitosa
+  if (queryVectorBlob && llmResponse && !attachedNormIds?.length) {
+    try {
+      await tursoCacheQuery(
+        "INSERT OR IGNORE INTO semantic_cache (query_text, embedding, response_text) VALUES (?, ?, ?)",
+        [`chat:${message.trim()}`, queryVectorBlob, llmResponse]
+      );
+      console.log("[CACHE WRITE] Respuesta guardada en cache semantica de Turso.");
+    } catch (cacheWriteErr) {
+      console.error("Error al guardar en cache semantica:", cacheWriteErr);
     }
   }
 
