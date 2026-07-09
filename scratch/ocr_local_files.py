@@ -96,23 +96,65 @@ def extraer_texto_pdf(filepath):
     if len(extracted_text) > 150:
         return extracted_text
         
-    # Intentar OCR
-    print("   -> PDF escaneado detectado. Intentando OCR local (Tesseract)...")
+    # Intentar OCR con OpenAI Vision
+    print("   -> PDF escaneado detectado. Intentando OCR por Visión de OpenAI...")
     try:
+        import io
+        import base64
         from pdf2image import convert_from_path
-        import pytesseract
+        
         images = convert_from_path(filepath)
         ocr_text = ""
         for i, img in enumerate(images):
-            print(f"      [OCR] Procesando página {i+1}/{len(images)}...")
-            page_text = pytesseract.image_to_string(img, lang="spa")
-            if page_text:
+            print(f"      [OpenAI Vision] Transcribiendo página {i+1}/{len(images)}...")
+            
+            # Guardar imagen en buffer en memoria como JPEG
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='JPEG')
+            base64_image = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+            
+            # Llamar a OpenAI Chat Completions con imagen
+            api_resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Transcribe textualmente a texto plano en español todo el contenido de este documento municipal. Corrige automáticamente palabras cortas o borrosas por contexto y mantén el formato original en lo posible. No agregues introducciones, resúmenes ni comentarios tuyos, solo el texto transcrito."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "max_tokens": 1500
+                },
+                timeout=45
+            )
+            
+            if api_resp.status_code == 200:
+                page_text = api_resp.json()["choices"][0]["message"]["content"]
                 ocr_text += page_text + "\n"
+            else:
+                print(f"         ⚠️ Error de API OpenAI en página {i+1}: {api_resp.text}")
+                
         ocr_text = ocr_text.strip()
         if ocr_text:
             return ocr_text
     except Exception as e:
-        print(f"   ❌ Error en OCR (Verifica que Tesseract/Poppler estén instalados en Windows): {e}")
+        print(f"   ❌ Error en OpenAI Vision OCR: {e}")
         
     return extracted_text if extracted_text else None
 
