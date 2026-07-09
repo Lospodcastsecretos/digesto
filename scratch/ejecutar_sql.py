@@ -2,6 +2,11 @@ import os
 import sys
 import requests
 
+# Configurar encoding para consola Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Cargar .env
 if os.path.exists(".env"):
     with open(".env", "r", encoding="utf-8") as f:
