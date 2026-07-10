@@ -279,7 +279,7 @@ def normalizar_publicacion(p):
         "titulo": p.get("titulo"),
         "resumen": p.get("resumen") or "",
         "tipo_nombre": tipo,
-        "categoria_nombre": p.get("categoria", {}).get("nombre") if isinstance(p.get("categoria"), dict) else "General",
+        "categoria_nombre": (p.get("categoria", {}).get("nombre") or "").strip() if isinstance(p.get("categoria"), dict) else "General",
         "vigente": es_vigente,
         "fecha": p.get("fecha_sancion") or "Histórico / Sin fecha",
         "archivo_pdf": p.get("archivo_pdf"),
