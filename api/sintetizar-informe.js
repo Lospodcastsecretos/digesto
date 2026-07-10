@@ -6,7 +6,6 @@ let dsTrippedUntil = 0; // Timestamp en ms
 
 export default async function handler(req, res) {
   const startTime = Date.now();
-  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
