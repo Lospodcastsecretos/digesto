@@ -152,9 +152,14 @@ ESTRUCTURA OBLIGATORIA DEL INFORME (Usa esta jerarquía Markdown):
 ## 3. Conclusiones y Estado de Vigencia
 (Analiza el balance general de las normas, cuántas siguen vigentes y recomendaciones legales rápidas).
 
-REGLAS DE ESTILO:
+REGLAS DE ESTILO Y DEEP LINKS:
 - Mantén un tono formal y técnico pero de lectura ágil.
 - Destaca con negritas los números de Ordenanza (ej. **Ordenanza N° 1234**) y beneficiarios clave.
+- OBLIGATORIO: Cada vez que listes o menciones una norma en el reporte, debes incluir un enlace directo (Deep Link) en formato Markdown que apunte al fragmento exacto del texto del que obtuviste el dato utilizando la sintaxis de fragmento de texto (Scroll-to-text).
+  * Formato: [Nombre de la Norma](https://digestoaltagracia.com.ar/#/detalles/{Norma_ID}:~:text={TEXT_FRAGMENT})
+  * El {Norma_ID} lo obtienes de "Norma ID" en el contexto.
+  * El {TEXT_FRAGMENT} debe ser una frase literal y corta (3-5 palabras) extraída de las condiciones o características de esa norma (ej: "eximicion%20del%20pago" o "tasa%20de%20servicios"). Codifica los espacios como %20.
+  * Ejemplo: [Ordenanza N° 7939](https://digestoaltagracia.com.ar/#/detalles/7939:~:text=tasa%20tarifaria%20anual)
 - Ve directo al grano sin introducciones del tipo "Aquí tienes tu informe...".`;
 
   let informeSintesis = '';
