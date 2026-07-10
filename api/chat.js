@@ -145,7 +145,8 @@ export default async function handler(req, res) {
   let suggestedNorms = [];
   let queryVectorBlob = null;
 
-  // Modo 1: El usuario adjuntó normas específicas para hablar sobr  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
+  // Modo 1: El usuario adjuntó normas específicas para hablar sobr
+  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
     try {
       const placeholders = attachedNormIds.map(() => '?').join(',');
       const searchSql = `
