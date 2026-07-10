@@ -92,6 +92,7 @@
     <div class="flex space-x-6 border-b border-gray-700 mb-6">
       <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab(event, 'tab-dashboard')">📊 Dashboard</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-cache')">🧠 Control de Caché</button>
+      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-simulador')">🧪 Modo Pruebas</button>
     </div>
 
     <!-- Estado de Carga -->
@@ -216,6 +217,29 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB: Simulador -->
+    <div id="tab-simulador" class="tab-content">
+      <div class="glass-card p-6 shadow-lg mb-8 max-w-3xl mx-auto flex flex-col h-[550px]">
+        <div class="mb-4">
+          <h3 class="text-xl font-semibold text-gray-200">🧪 Simulador (Modo Pruebas)</h3>
+          <p class="text-xs text-gray-400 mt-1">Prueba las respuestas de Burocracio sin registrar telemetría ni contaminar estadísticas.</p>
+        </div>
+        
+        <!-- Chat output area -->
+        <div id="sim-chat-box" class="flex-1 bg-gray-900 border border-gray-700 rounded p-4 overflow-y-auto mb-4 space-y-4 text-sm font-sans custom-scrollbar">
+          <div class="text-gray-400 italic text-center">Burocracio está listo. Escribe tu mensaje abajo.</div>
+        </div>
+        
+        <!-- Chat input area -->
+        <form id="sim-chat-form" class="flex space-x-3">
+          <input type="text" id="sim-chat-input" placeholder="Pregunta algo sobre las ordenanzas..." class="flex-1 p-3 rounded bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-blue-500 text-sm" required>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded font-semibold text-sm transition">
+            Enviar
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -490,6 +514,92 @@
         alert("Error de red");
       }
     }
+
+    // --- Lógica del Simulador (Modo Pruebas) ---
+    const simChatForm = document.getElementById('sim-chat-form');
+    const simChatInput = document.getElementById('sim-chat-input');
+    const simChatBox = document.getElementById('sim-chat-box');
+    let simChatHistory = [];
+
+    simChatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = simChatInput.value.trim();
+      if (!msg) return;
+
+      // Render user message
+      simChatBox.innerHTML += `
+        <div class="flex justify-end">
+          <div class="bg-blue-600 text-white p-3 rounded-lg max-w-[80%] shadow-md">
+            ${msg}
+          </div>
+        </div>`;
+      simChatInput.value = '';
+      simChatBox.scrollTop = simChatBox.scrollHeight;
+
+      // Render loading message
+      const botMsgId = 'bot-msg-' + Date.now();
+      simChatBox.innerHTML += `
+        <div class="flex justify-start">
+          <div id="${botMsgId}" class="bg-gray-850 text-gray-200 p-3 rounded-lg max-w-[80%] shadow-md border border-gray-700 italic">
+            Pensando...
+          </div>
+        </div>`;
+      simChatBox.scrollTop = simChatBox.scrollHeight;
+
+      const botMsgEl = document.getElementById(botMsgId);
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            history: simChatHistory,
+            isTest: true
+          })
+        });
+
+        if (!response.ok) throw new Error("Error en la conexión.");
+
+        // Read stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let botText = '';
+        botMsgEl.classList.remove('italic');
+        botMsgEl.innerHTML = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(line.substring(6).trim());
+                if (parsed.text) {
+                  botText += parsed.text;
+                  // Reemplazar saltos de línea y formateo básico de markdown
+                  botMsgEl.innerHTML = botText
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                  simChatBox.scrollTop = simChatBox.scrollHeight;
+                }
+              } catch (err) {}
+            }
+          }
+        }
+
+        // Save history
+        simChatHistory.push({ role: 'user', content: msg });
+        simChatHistory.push({ role: 'assistant', content: botText });
+
+      } catch (err) {
+        botMsgEl.innerHTML = `<span class="text-red-400 font-semibold">Error: No se pudo obtener respuesta del chatbot.</span>`;
+      }
+    });
   </script>
 </body>
 </html>

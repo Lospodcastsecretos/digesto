@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch(e) {}
   }
-  const { message, history, attachedNormIds } = body || {};
+  const { message, history, attachedNormIds, isTest } = body || {};
   if (!message) {
     res.status(400).json({ 
       error: `Mensaje vacío. Body: ${JSON.stringify(body)}. Typeof req.body: ${typeof req.body}. Content-Type: ${req.headers['content-type']}` 
@@ -304,7 +304,9 @@ Tu respuesta (como asistente jurídico del municipio):`;
         res.write(`data: ${JSON.stringify({ suggestedNorms, provider: "Caché Semántica (Turso)" })}\n\n`);
         res.end();
         
-        await registrarTelemetria('chat', message, true, Date.now() - startTime, 0, 0);
+        if (!isTest) {
+          await registrarTelemetria('chat', message, true, Date.now() - startTime, 0, 0);
+        }
         return;
       }
     } catch (cacheErr) {
@@ -436,5 +438,7 @@ Tu respuesta (como asistente jurídico del municipio):`;
   res.write(`data: ${JSON.stringify({ suggestedNorms, provider: activeProvider })}\n\n`);
   res.end();
   
-  await registrarTelemetria('chat', message, false, Date.now() - startTime, 0, 0);
+  if (!isTest) {
+    await registrarTelemetria('chat', message, false, Date.now() - startTime, 0, 0);
+  }
 }
