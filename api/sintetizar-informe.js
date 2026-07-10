@@ -1,8 +1,11 @@
+import { registrarTelemetria } from './_lib/telemetria.js';
+
 // Variables globales del Circuit Breaker (en memoria de Vercel)
 let dsFailures = 0;
 let dsTrippedUntil = 0; // Timestamp en ms
 
 export default async function handler(req, res) {
+  const startTime = Date.now();
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -39,6 +42,7 @@ export default async function handler(req, res) {
     res.status(200).json({ 
       informe: `# Informe Temático: ${query}\n\nNo se encontraron normas vigentes o aplicables que traten específicamente sobre este tema en el Digesto.`
     });
+    await registrarTelemetria('informe', query, false, Date.now() - startTime, 0, 0);
     return;
   }
 
@@ -118,6 +122,7 @@ export default async function handler(req, res) {
             informe: cacheRows[0].response_text, 
             modelo: "Caché Semántica (Turso)" 
           });
+          await registrarTelemetria('informe', query, true, Date.now() - startTime, 0, 0);
           return;
         }
       }
@@ -220,4 +225,5 @@ REGLAS DE ESTILO Y DEEP LINKS:
   }
 
   res.status(200).json({ informe: informeSintesis, modelo: activeModel });
+  await registrarTelemetria('informe', query, false, Date.now() - startTime, 0, 0);
 }

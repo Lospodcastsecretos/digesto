@@ -1,3 +1,5 @@
+import { registrarTelemetria } from './_lib/telemetria.js';
+
 // Variables globales del Circuit Breaker (en memoria del contenedor warm de Vercel)
 let dsFailures = 0;
 let dsTrippedUntil = 0; // Timestamp en ms
@@ -23,6 +25,7 @@ function expandirSinonimos(word) {
 }
 
 export default async function handler(req, res) {
+  const startTime = Date.now();
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -300,6 +303,8 @@ Tu respuesta (como asistente jurídico del municipio):`;
         
         res.write(`data: ${JSON.stringify({ suggestedNorms, provider: "Caché Semántica (Turso)" })}\n\n`);
         res.end();
+        
+        await registrarTelemetria('chat', message, true, Date.now() - startTime, 0, 0);
         return;
       }
     } catch (cacheErr) {
@@ -430,4 +435,6 @@ Tu respuesta (como asistente jurídico del municipio):`;
   // Enviar las sugerencias de normas, el proveedor y finalizar la conexión
   res.write(`data: ${JSON.stringify({ suggestedNorms, provider: activeProvider })}\n\n`);
   res.end();
+  
+  await registrarTelemetria('chat', message, false, Date.now() - startTime, 0, 0);
 }

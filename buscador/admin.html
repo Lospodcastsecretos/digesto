@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Digesto Municipal</title>
+  <!-- Tailwind CSS para el diseño rápido y moderno -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-primary: #121826;
+      --bg-card: #1f2937;
+      --accent: #3b82f6;
+      --text-main: #f3f4f6;
+    }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .glass-card {
+      background: rgba(31, 41, 55, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+    }
+    .loader {
+      border-top-color: var(--accent);
+      -webkit-animation: spinner 1.5s linear infinite;
+      animation: spinner 1.5s linear infinite;
+    }
+    @keyframes spinner {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Estilos del Login */
+    #login-screen {
+      position: fixed; inset: 0;
+      background: var(--bg-primary);
+      z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #dashboard-screen { display: none; }
+  </style>
+</head>
+<body class="min-h-screen text-gray-100 p-6">
+
+  <!-- Pantalla de Login -->
+  <div id="login-screen">
+    <div class="glass-card p-8 w-full max-w-md shadow-2xl flex flex-col items-center">
+      <div class="mb-6 bg-blue-600 p-3 rounded-full">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+      </div>
+      <h2 class="text-2xl font-bold mb-6">Administración Digesto</h2>
+      <form id="login-form" class="w-full">
+        <input type="password" id="password" placeholder="Contraseña de Administrador" class="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-blue-500 mb-4" required>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 transition p-3 rounded font-semibold text-white">Ingresar</button>
+        <p id="login-error" class="text-red-400 text-sm mt-3 text-center hidden"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Pantalla Principal (Dashboard) -->
+  <div id="dashboard-screen" class="max-w-7xl mx-auto opacity-0 transition-opacity duration-500">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">Digesto Analytics</h1>
+        <p class="text-gray-400 text-sm mt-1">Panel de control y telemetría de Burocracio IA</p>
+      </div>
+      <button onclick="logout()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition">Cerrar Sesión</button>
+    </header>
+
+    <!-- Estado de Carga -->
+    <div id="loading" class="flex justify-center items-center py-20 hidden">
+      <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+    </div>
+
+    <div id="dashboard-content">
+      <!-- Tarjetas de KPIs -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="glass-card p-6 shadow-lg">
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Total Consultas</p>
+          <p id="kpi-total" class="text-4xl font-bold text-white">0</p>
+        </div>
+        <div class="glass-card p-6 shadow-lg border-t-4 border-t-green-500">
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Caché Hits (Ahorro)</p>
+          <p id="kpi-hits" class="text-4xl font-bold text-green-400">0</p>
+        </div>
+        <div class="glass-card p-6 shadow-lg border-t-4 border-t-orange-500">
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Caché Misses (API LLM)</p>
+          <p id="kpi-misses" class="text-4xl font-bold text-orange-400">0</p>
+        </div>
+        <div class="glass-card p-6 shadow-lg">
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Hit Rate %</p>
+          <p id="kpi-rate" class="text-4xl font-bold text-blue-400">0%</p>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="glass-card p-6 shadow-lg">
+          <h3 class="text-lg font-semibold mb-4 text-gray-200">Uso por Tipo de Consulta</h3>
+          <div class="relative h-64 w-full flex justify-center">
+            <canvas id="chartTipos"></canvas>
+          </div>
+        </div>
+        
+        <div class="glass-card p-6 shadow-lg">
+          <h3 class="text-lg font-semibold mb-4 text-gray-200">Top 10 Términos Buscados en Chat</h3>
+          <div class="overflow-y-auto max-h-64 pr-2 custom-scrollbar">
+            <ul id="top-temas-list" class="space-y-3">
+              <!-- Llenado dinámico -->
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Actividad Reciente -->
+      <div class="glass-card p-6 shadow-lg mb-8">
+        <h3 class="text-lg font-semibold mb-4 text-gray-200 flex items-center">
+          <svg class="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Actividad Reciente (Últimas 20)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-gray-700 text-gray-400 text-sm">
+                <th class="py-3 px-4 font-medium">Fecha/Hora</th>
+                <th class="py-3 px-4 font-medium">Tipo</th>
+                <th class="py-3 px-4 font-medium">Consulta</th>
+                <th class="py-3 px-4 font-medium">Origen</th>
+                <th class="py-3 px-4 font-medium">Latencia</th>
+              </tr>
+            </thead>
+            <tbody id="activity-table-body" class="text-sm">
+              <!-- Llenado dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let chartInstance = null;
+    let currentToken = localStorage.getItem('digesto_admin_token');
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (currentToken) {
+        showDashboard();
+        fetchStats();
+      }
+    });
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = document.getElementById('password').value;
+      const errEl = document.getElementById('login-error');
+      
+      try {
+        const res = await fetch('/api/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
+        });
+        
+        const data = await res.json();
+        if (res.ok && data.success) {
+          currentToken = data.token;
+          localStorage.setItem('digesto_admin_token', currentToken);
+          showDashboard();
+          fetchStats();
+        } else {
+          errEl.textContent = data.error || "Error de autenticación";
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = "Error de red al intentar login.";
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    function logout() {
+      localStorage.removeItem('digesto_admin_token');
+      currentToken = null;
+      document.getElementById('password').value = '';
+      document.getElementById('dashboard-screen').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('dashboard-screen').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+      }, 500);
+    }
+
+    function showDashboard() {
+      document.getElementById('login-screen').style.display = 'none';
+      const ds = document.getElementById('dashboard-screen');
+      ds.style.display = 'block';
+      setTimeout(() => ds.style.opacity = '1', 50);
+    }
+
+    async function fetchStats() {
+      document.getElementById('dashboard-content').classList.add('hidden');
+      document.getElementById('loading').classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/admin-estadisticas', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        const data = await res.json();
+        renderDashboard(data);
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('dashboard-content').classList.remove('hidden');
+      }
+    }
+
+    function renderDashboard(data) {
+      // 1. KPIs
+      document.getElementById('kpi-total').textContent = data.totalConsultas || 0;
+      document.getElementById('kpi-hits').textContent = data.cacheHits || 0;
+      document.getElementById('kpi-misses').textContent = data.cacheMisses || 0;
+      document.getElementById('kpi-rate').textContent = `${data.cacheHitRate || 0}%`;
+
+      // 2. Gráfico de Dona (Tipos de Consulta)
+      const ctx = document.getElementById('chartTipos').getContext('2d');
+      const tiposData = data.porTipo || [];
+      const labels = tiposData.map(t => t.tipo_consulta === 'chat' ? 'Chat (Burocracio)' : 'Informes Temáticos');
+      const values = tiposData.map(t => t.cantidad);
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length ? labels : ['Sin datos'],
+          datasets: [{
+            data: values.length ? values : [1],
+            backgroundColor: values.length ? ['#3b82f6', '#8b5cf6', '#10b981'] : ['#374151'],
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#f3f4f6' } }
+          }
+        }
+      });
+
+      // 3. Top Temas
+      const topList = document.getElementById('top-temas-list');
+      topList.innerHTML = '';
+      if (data.topTemas && data.topTemas.length > 0) {
+        data.topTemas.forEach((tema, idx) => {
+          topList.innerHTML += `
+            <li class="flex justify-between items-center bg-gray-800 rounded p-3 border border-gray-700">
+              <span class="flex items-center text-gray-200">
+                <span class="bg-gray-700 text-gray-400 text-xs font-bold rounded px-2 py-1 mr-3">#${idx+1}</span>
+                <span class="truncate max-w-[200px]" title="${tema.tema}">"${tema.tema}"</span>
+              </span>
+              <span class="bg-blue-900 text-blue-200 text-xs font-bold px-2 py-1 rounded-full">${tema.cantidad} veces</span>
+            </li>
+          `;
+        });
+      } else {
+        topList.innerHTML = '<li class="text-gray-500 text-sm text-center py-4">No hay suficientes datos aún</li>';
+      }
+
+      // 4. Actividad Reciente
+      const tbody = document.getElementById('activity-table-body');
+      tbody.innerHTML = '';
+      if (data.actividadReciente && data.actividadReciente.length > 0) {
+        data.actividadReciente.forEach(log => {
+          // Parsear fecha
+          let dateStr = "Desconocida";
+          try {
+             // Turso devuelve UTC "YYYY-MM-DD HH:MM:SS"
+             const d = new Date(log.timestamp + "Z");
+             dateStr = d.toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
+          } catch(e) {}
+
+          const isHit = log.cache_hit === 1;
+          const badgeColor = isHit ? 'bg-green-900 text-green-300' : 'bg-orange-900 text-orange-300';
+          const badgeText = isHit ? 'Caché' : 'API LLM';
+          
+          const typeIcon = log.tipo_consulta === 'chat' 
+            ? '<span title="Chatbot" class="text-blue-400">💬</span>' 
+            : '<span title="Informe" class="text-purple-400">📊</span>';
+
+          tbody.innerHTML += `
+            <tr class="border-b border-gray-800 hover:bg-gray-800 transition">
+              <td class="py-3 px-4 whitespace-nowrap text-gray-400">${dateStr}</td>
+              <td class="py-3 px-4">${typeIcon}</td>
+              <td class="py-3 px-4 text-gray-200 max-w-[300px] truncate" title="${log.query_text}">"${log.query_text}"</td>
+              <td class="py-3 px-4"><span class="px-2 py-1 rounded text-xs font-bold ${badgeColor}">${badgeText}</span></td>
+              <td class="py-3 px-4 text-gray-400">${log.duracion_ms ? (log.duracion_ms/1000).toFixed(1)+'s' : '-'}</td>
+            </tr>
+          `;
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-500">Sin actividad reciente</td></tr>';
+      }
+    }
+  </script>
+</body>
+</html>

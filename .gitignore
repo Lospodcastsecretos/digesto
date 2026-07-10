@@ -21,3 +21,10 @@ credenciales.json
 
 .env
 .env.local
+
+# Documentos pesados y descargas
+scratch/documentos_corregidos/
+scratch/descargas/
+buscador/descargas/
+*.pdf
+*.docx
