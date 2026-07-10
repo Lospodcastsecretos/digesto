@@ -35,6 +35,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Medidas de seguridad y límites de payload
+  if (extractos.length > 100) {
+    res.status(400).json({ error: "La cantidad de extractos a sintetizar excede el límite permitido (100)." });
+    return;
+  }
+  if (query && query.length > 200) {
+    res.status(400).json({ error: "La consulta del informe excede los 200 caracteres." });
+    return;
+  }
+
   // Filtrar solo las normas que aplican al tema
   const normasAplicables = extractos.filter(e => e.aplica === true);
 

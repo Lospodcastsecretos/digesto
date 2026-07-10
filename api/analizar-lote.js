@@ -66,6 +66,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Medidas de seguridad y límites de payload
+  if (ids.length > 25) {
+    res.status(400).json({ error: "El lote supera el límite máximo permitido de 25 normas." });
+    return;
+  }
+  if (query && query.length > 200) {
+    res.status(400).json({ error: "La consulta de análisis excede los 200 caracteres." });
+    return;
+  }
+
   try {
     // 1. Traer datos de las normas del lote
     const placeholders = ids.map(() => "?").join(",");

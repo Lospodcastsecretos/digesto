@@ -68,6 +68,20 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Medidas de seguridad y límites de payload
+  if (message.length > 1000) {
+    res.status(400).json({ error: "El mensaje excede la longitud máxima permitida (1000 caracteres)." });
+    return;
+  }
+  if (history && Array.isArray(history) && history.length > 15) {
+    res.status(400).json({ error: "El historial de conversación es demasiado largo." });
+    return;
+  }
+  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 10) {
+    res.status(400).json({ error: "No se pueden adjuntar más de 10 normas por consulta." });
+    return;
+  }
+
   // Helper para empaquetar el vector como Float32 Little-Endian en Base64
   const packVector = (arr) => {
     const buffer = new ArrayBuffer(arr.length * 4);
