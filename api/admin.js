@@ -43,24 +43,30 @@ export default async function handler(req, res) {
     return;
   }
 
-  // --- RUTAS PROTEGIDAS (Requieren autenticación) ---
+  // RUTAS PROTEGIDAS (Requieren autenticación)
   if (!verifyAdminAuth(req)) {
     res.status(401).json({ error: "No autorizado. Token inválido o expirado." });
     return;
   }
 
-  const tursoUrl = (process.env.TURSO_CACHE_URL || process.env.TURSO_URL || "").replace("libsql://", "https://") + "/v2/pipeline";
-  const tursoToken = process.env.TURSO_CACHE_TOKEN || process.env.TURSO_TOKEN;
+  const mainTursoUrl = (process.env.TURSO_URL || "").replace("libsql://", "https://").replace("http://", "https://") + "/v2/pipeline";
+  const mainTursoToken = process.env.TURSO_TOKEN;
 
-  async function query(sql, args = []) {
+  const cacheTursoUrl = (process.env.TURSO_CACHE_URL || process.env.TURSO_URL || "").replace("libsql://", "https://").replace("http://", "https://") + "/v2/pipeline";
+  const cacheTursoToken = process.env.TURSO_CACHE_TOKEN || process.env.TURSO_TOKEN;
+
+  async function query(sql, args = [], target = 'main') {
+    const url = target === 'cache' ? cacheTursoUrl : mainTursoUrl;
+    const token = target === 'cache' ? cacheTursoToken : mainTursoToken;
+
     const formattedArgs = args.map(arg => {
       if (typeof arg === 'number') return { type: 'integer', value: arg.toString() };
       return { type: 'text', value: arg.toString() };
     });
 
-    const response = await fetch(tursoUrl, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${tursoToken}`, "Content-Type": "application/json" },
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         requests: [
           { type: "execute", stmt: { sql, args: formattedArgs } },
@@ -114,7 +120,7 @@ export default async function handler(req, res) {
 
       let cacheEntries = [];
       try {
-        cacheEntries = await query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50");
+        cacheEntries = await query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50", [], 'cache');
       } catch (e) {
         console.warn("La tabla semantic_cache no pudo ser consultada o no existe:", e);
       }
@@ -139,7 +145,7 @@ export default async function handler(req, res) {
       const { rowid } = body || {};
       if (!rowid) return res.status(400).json({ error: "Falta el parámetro rowid." });
 
-      await query("DELETE FROM semantic_cache WHERE rowid = ?", [rowid]);
+      await query("DELETE FROM semantic_cache WHERE rowid = ?", [rowid], 'cache');
       res.status(200).json({ success: true, message: "Registro eliminado exitosamente." });
       return;
     }
@@ -148,7 +154,7 @@ export default async function handler(req, res) {
     if (action === 'cache-clear') {
       if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
-      await query("DELETE FROM semantic_cache");
+      await query("DELETE FROM semantic_cache", [], 'cache');
       res.status(200).json({ success: true, message: "Caché limpiado exitosamente." });
       return;
     }
