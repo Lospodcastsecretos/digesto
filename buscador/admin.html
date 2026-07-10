@@ -84,8 +84,8 @@
 
     <!-- Tabs Navigation -->
     <div class="flex space-x-6 border-b border-gray-700 mb-6">
-      <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab('tab-dashboard')">📊 Dashboard</button>
-      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab('tab-cache')">🧠 Control de Caché</button>
+      <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab(event, 'tab-dashboard')">📊 Dashboard</button>
+      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-cache')">🧠 Control de Caché</button>
     </div>
 
     <!-- Estado de Carga -->
@@ -93,8 +93,10 @@
       <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
     </div>
 
-    <!-- TAB: Dashboard -->
-    <div id="tab-dashboard" class="tab-content active">
+    <!-- Container for tabs contents -->
+    <div id="tabs-content-container">
+      <!-- TAB: Dashboard -->
+      <div id="tab-dashboard" class="tab-content active">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="glass-card p-6 shadow-lg">
           <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Total Consultas</p>
@@ -239,16 +241,16 @@
       setTimeout(() => ds.style.opacity = '1', 50);
     }
 
-    function switchTab(tabId) {
+    function switchTab(e, tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       
-      event.target.classList.add('active');
+      e.currentTarget.classList.add('active');
       document.getElementById(tabId).classList.add('active');
     }
 
     async function fetchStats() {
-      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById('tabs-content-container').classList.add('hidden');
       document.getElementById('loading').classList.remove('hidden');
 
       try {
@@ -268,9 +270,7 @@
         console.error("Error fetching stats:", err);
       } finally {
         document.getElementById('loading').classList.add('hidden');
-        // Restore active tab display
-        const activeTab = document.querySelector('.tab-btn.active').getAttribute('onclick').match(/'([^']+)'/)[1];
-        document.getElementById(activeTab).style.display = 'block';
+        document.getElementById('tabs-content-container').classList.remove('hidden');
       }
     }
 
