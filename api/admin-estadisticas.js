@@ -75,6 +75,14 @@ export default async function handler(req, res) {
     // Consultas por tipo
     const porTipo = await query("SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta");
 
+    // Últimas entradas de Caché Semántico (limitado a 50)
+    let cacheEntries = [];
+    try {
+      cacheEntries = await query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50");
+    } catch (e) {
+      console.warn("La tabla semantic_cache no pudo ser consultada o no existe:", e);
+    }
+
     res.status(200).json({
       totalConsultas,
       cacheHits,
@@ -82,7 +90,8 @@ export default async function handler(req, res) {
       cacheHitRate,
       actividadReciente: ultimasConsultas,
       topTemas,
-      porTipo
+      porTipo,
+      cacheEntries
     });
   } catch (err) {
     console.error("Error en admin-estadisticas:", err);

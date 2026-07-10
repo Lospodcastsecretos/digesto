@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Digesto Municipal</title>
-  <!-- Tailwind CSS para el diseño rápido y moderno -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
@@ -35,7 +33,6 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    /* Estilos del Login */
     #login-screen {
       position: fixed; inset: 0;
       background: var(--bg-primary);
@@ -43,6 +40,18 @@
       display: flex; align-items: center; justify-content: center;
     }
     #dashboard-screen { display: none; }
+    
+    /* Tabs styles */
+    .tab-btn {
+      color: #9ca3af;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-btn.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
   </style>
 </head>
 <body class="min-h-screen text-gray-100 p-6">
@@ -65,7 +74,7 @@
   <!-- Pantalla Principal (Dashboard) -->
   <div id="dashboard-screen" class="max-w-7xl mx-auto opacity-0 transition-opacity duration-500">
     <!-- Header -->
-    <header class="flex justify-between items-center mb-8">
+    <header class="flex justify-between items-center mb-6">
       <div>
         <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">Digesto Analytics</h1>
         <p class="text-gray-400 text-sm mt-1">Panel de control y telemetría de Burocracio IA</p>
@@ -73,13 +82,19 @@
       <button onclick="logout()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition">Cerrar Sesión</button>
     </header>
 
+    <!-- Tabs Navigation -->
+    <div class="flex space-x-6 border-b border-gray-700 mb-6">
+      <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab('tab-dashboard')">📊 Dashboard</button>
+      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab('tab-cache')">🧠 Control de Caché</button>
+    </div>
+
     <!-- Estado de Carga -->
     <div id="loading" class="flex justify-center items-center py-20 hidden">
       <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
     </div>
 
-    <div id="dashboard-content">
-      <!-- Tarjetas de KPIs -->
+    <!-- TAB: Dashboard -->
+    <div id="tab-dashboard" class="tab-content active">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="glass-card p-6 shadow-lg">
           <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Total Consultas</p>
@@ -90,7 +105,7 @@
           <p id="kpi-hits" class="text-4xl font-bold text-green-400">0</p>
         </div>
         <div class="glass-card p-6 shadow-lg border-t-4 border-t-orange-500">
-          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Caché Misses (API LLM)</p>
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-1">Caché Misses</p>
           <p id="kpi-misses" class="text-4xl font-bold text-orange-400">0</p>
         </div>
         <div class="glass-card p-6 shadow-lg">
@@ -99,7 +114,6 @@
         </div>
       </div>
 
-      <!-- Gráficos -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div class="glass-card p-6 shadow-lg">
           <h3 class="text-lg font-semibold mb-4 text-gray-200">Uso por Tipo de Consulta</h3>
@@ -109,21 +123,15 @@
         </div>
         
         <div class="glass-card p-6 shadow-lg">
-          <h3 class="text-lg font-semibold mb-4 text-gray-200">Top 10 Términos Buscados en Chat</h3>
-          <div class="overflow-y-auto max-h-64 pr-2 custom-scrollbar">
-            <ul id="top-temas-list" class="space-y-3">
-              <!-- Llenado dinámico -->
-            </ul>
+          <h3 class="text-lg font-semibold mb-4 text-gray-200">Top 10 Términos Buscados</h3>
+          <div class="overflow-y-auto max-h-64 pr-2">
+            <ul id="top-temas-list" class="space-y-3"></ul>
           </div>
         </div>
       </div>
 
-      <!-- Tabla de Actividad Reciente -->
       <div class="glass-card p-6 shadow-lg mb-8">
-        <h3 class="text-lg font-semibold mb-4 text-gray-200 flex items-center">
-          <svg class="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Actividad Reciente (Últimas 20)
-        </h3>
+        <h3 class="text-lg font-semibold mb-4 text-gray-200">Actividad Reciente</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -135,8 +143,38 @@
                 <th class="py-3 px-4 font-medium">Latencia</th>
               </tr>
             </thead>
-            <tbody id="activity-table-body" class="text-sm">
-              <!-- Llenado dinámico -->
+            <tbody id="activity-table-body" class="text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Caché -->
+    <div id="tab-cache" class="tab-content">
+      <div class="glass-card p-6 shadow-lg mb-8">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h3 class="text-xl font-semibold text-gray-200">Memoria de IA (Caché Semántico)</h3>
+            <p class="text-sm text-gray-400 mt-1">Respuestas pre-calculadas para búsquedas frecuentes.</p>
+          </div>
+          <button onclick="clearCache()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            Vaciar Caché Completo
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-gray-700 text-gray-400 text-sm">
+                <th class="py-3 px-4 font-medium">ID</th>
+                <th class="py-3 px-4 font-medium">Pregunta Original</th>
+                <th class="py-3 px-4 font-medium">Respuesta Guardada</th>
+                <th class="py-3 px-4 font-medium w-24">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="cache-table-body" class="text-sm">
+              <!-- Renderizado dinámico -->
             </tbody>
           </table>
         </div>
@@ -201,8 +239,16 @@
       setTimeout(() => ds.style.opacity = '1', 50);
     }
 
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
     async function fetchStats() {
-      document.getElementById('dashboard-content').classList.add('hidden');
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
       document.getElementById('loading').classList.remove('hidden');
 
       try {
@@ -217,22 +263,23 @@
 
         const data = await res.json();
         renderDashboard(data);
+        renderCacheTable(data.cacheEntries);
       } catch (err) {
         console.error("Error fetching stats:", err);
       } finally {
         document.getElementById('loading').classList.add('hidden');
-        document.getElementById('dashboard-content').classList.remove('hidden');
+        // Restore active tab display
+        const activeTab = document.querySelector('.tab-btn.active').getAttribute('onclick').match(/'([^']+)'/)[1];
+        document.getElementById(activeTab).style.display = 'block';
       }
     }
 
     function renderDashboard(data) {
-      // 1. KPIs
       document.getElementById('kpi-total').textContent = data.totalConsultas || 0;
       document.getElementById('kpi-hits').textContent = data.cacheHits || 0;
       document.getElementById('kpi-misses').textContent = data.cacheMisses || 0;
       document.getElementById('kpi-rate').textContent = `${data.cacheHitRate || 0}%`;
 
-      // 2. Gráfico de Dona (Tipos de Consulta)
       const ctx = document.getElementById('chartTipos').getContext('2d');
       const tiposData = data.porTipo || [];
       const labels = tiposData.map(t => t.tipo_consulta === 'chat' ? 'Chat (Burocracio)' : 'Informes Temáticos');
@@ -250,16 +297,9 @@
             hoverOffset: 4
           }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#f3f4f6' } }
-          }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#f3f4f6' } } } }
       });
 
-      // 3. Top Temas
       const topList = document.getElementById('top-temas-list');
       topList.innerHTML = '';
       if (data.topTemas && data.topTemas.length > 0) {
@@ -271,22 +311,18 @@
                 <span class="truncate max-w-[200px]" title="${tema.tema}">"${tema.tema}"</span>
               </span>
               <span class="bg-blue-900 text-blue-200 text-xs font-bold px-2 py-1 rounded-full">${tema.cantidad} veces</span>
-            </li>
-          `;
+            </li>`;
         });
       } else {
-        topList.innerHTML = '<li class="text-gray-500 text-sm text-center py-4">No hay suficientes datos aún</li>';
+        topList.innerHTML = '<li class="text-gray-500 text-sm text-center py-4">No hay datos</li>';
       }
 
-      // 4. Actividad Reciente
       const tbody = document.getElementById('activity-table-body');
       tbody.innerHTML = '';
       if (data.actividadReciente && data.actividadReciente.length > 0) {
         data.actividadReciente.forEach(log => {
-          // Parsear fecha
           let dateStr = "Desconocida";
           try {
-             // Turso devuelve UTC "YYYY-MM-DD HH:MM:SS"
              const d = new Date(log.timestamp + "Z");
              dateStr = d.toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
           } catch(e) {}
@@ -294,10 +330,7 @@
           const isHit = log.cache_hit === 1;
           const badgeColor = isHit ? 'bg-green-900 text-green-300' : 'bg-orange-900 text-orange-300';
           const badgeText = isHit ? 'Caché' : 'API LLM';
-          
-          const typeIcon = log.tipo_consulta === 'chat' 
-            ? '<span title="Chatbot" class="text-blue-400">💬</span>' 
-            : '<span title="Informe" class="text-purple-400">📊</span>';
+          const typeIcon = log.tipo_consulta === 'chat' ? '💬' : '📊';
 
           tbody.innerHTML += `
             <tr class="border-b border-gray-800 hover:bg-gray-800 transition">
@@ -306,11 +339,88 @@
               <td class="py-3 px-4 text-gray-200 max-w-[300px] truncate" title="${log.query_text}">"${log.query_text}"</td>
               <td class="py-3 px-4"><span class="px-2 py-1 rounded text-xs font-bold ${badgeColor}">${badgeText}</span></td>
               <td class="py-3 px-4 text-gray-400">${log.duracion_ms ? (log.duracion_ms/1000).toFixed(1)+'s' : '-'}</td>
-            </tr>
-          `;
+            </tr>`;
         });
       } else {
         tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-500">Sin actividad reciente</td></tr>';
+      }
+    }
+
+    function renderCacheTable(entries) {
+      const tbody = document.getElementById('cache-table-body');
+      tbody.innerHTML = '';
+      if (entries && entries.length > 0) {
+        entries.forEach(entry => {
+          const type = entry.query_text.startsWith('chat:') ? 'Chat' : 'Informe';
+          const queryClean = entry.query_text.replace(/^(chat:|report:)/, '');
+          
+          tbody.innerHTML += `
+            <tr class="border-b border-gray-800 hover:bg-gray-800 transition">
+              <td class="py-3 px-4 text-gray-400 font-mono text-xs">#${entry.rowid}</td>
+              <td class="py-3 px-4 text-gray-200 max-w-[200px]">
+                <span class="text-xs font-bold text-gray-400 block mb-1">${type}</span>
+                <div class="truncate" title="${queryClean}">${queryClean}</div>
+              </td>
+              <td class="py-3 px-4 text-gray-400 max-w-[350px]">
+                <div class="h-12 overflow-y-auto custom-scrollbar text-xs border border-gray-700 p-1 rounded bg-gray-900">${entry.response_text}</div>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <button onclick="deleteCacheEntry(${entry.rowid})" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded transition" title="Borrar esta respuesta">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </td>
+            </tr>`;
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-gray-500">El caché está vacío en este momento.</td></tr>';
+      }
+    }
+
+    async function deleteCacheEntry(rowid) {
+      if (!confirm(`¿Estás seguro de que deseas borrar la respuesta #${rowid} del caché?`)) return;
+      
+      try {
+        const res = await fetch('/api/admin-cache-delete', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}` 
+          },
+          body: JSON.stringify({ rowid })
+        });
+        
+        if (res.ok) {
+          fetchStats(); // Recargar datos
+        } else {
+          const data = await res.json();
+          alert("Error: " + (data.error || "No se pudo borrar"));
+        }
+      } catch (err) {
+        alert("Error de red");
+      }
+    }
+
+    async function clearCache() {
+      if (!confirm("⚠️ PELIGRO: ¿Estás seguro de que deseas vaciar TODO el caché semántico?\n\nLa IA olvidará todas las respuestas guardadas y tendrá que volver a pensar cada pregunta (lo que incrementará ligeramente los costos temporales).")) return;
+      
+      try {
+        const res = await fetch('/api/admin-cache-clear', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}` 
+          }
+        });
+        
+        if (res.ok) {
+          alert("¡Caché limpiado exitosamente!");
+          fetchStats(); // Recargar
+        } else {
+          const data = await res.json();
+          alert("Error: " + (data.error || "No se pudo limpiar"));
+        }
+      } catch (err) {
+        alert("Error de red");
       }
     }
   </script>
