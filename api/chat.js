@@ -1,4 +1,5 @@
 import { registrarTelemetria } from './_lib/telemetria.js';
+import { getQueryEmbedding } from './_lib/embeddings.js';
 
 // Variables globales del Circuit Breaker (en memoria del contenedor warm de Vercel)
 let dsFailures = 0;
@@ -192,24 +193,10 @@ export default async function handler(req, res) {
       try {
         let candidateIds = [];
 
-        // 2.1 Obtener embedding de OpenAI para la pregunta del usuario
+        // 2.1 Obtener embedding (desde cache o generando uno nuevo)
         if (openAiApiKey) {
           try {
-            const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${openAiApiKey}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                input: message.trim(),
-                model: "text-embedding-3-small"
-              })
-            });
-            if (openAiResp.ok) {
-              const openAiData = await openAiResp.json();
-              queryVectorBlob = { type: 'blob', base64: packVector(openAiData.data[0].embedding) };
-            }
+            queryVectorBlob = await getQueryEmbedding(message, openAiApiKey, cacheUrl, cacheAuthToken);
           } catch (err) {
             console.error("Error al obtener embedding en Chat:", err);
           }

@@ -1,3 +1,5 @@
+import { getQueryEmbedding } from './_lib/embeddings.js';
+
 export default async function handler(req, res) {
   // Habilitar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,6 +18,8 @@ export default async function handler(req, res) {
   const url = process.env.TURSO_URL;
   const authToken = process.env.TURSO_TOKEN;
   const openAiApiKey = process.env.OPENAI_API_KEY;
+  const cacheUrl = process.env.TURSO_CACHE_URL || url;
+  const cacheAuthToken = process.env.TURSO_CACHE_TOKEN || authToken;
 
   if (!url || !authToken) {
     res.status(500).json({ error: "Faltan las variables de entorno de conexión a Turso (TURSO_URL o TURSO_TOKEN)." });
@@ -51,41 +55,16 @@ export default async function handler(req, res) {
       });
     };
 
-    // Helper para empaquetar el vector como Float32 Little-Endian en Base64
-    const packVector = (arr) => {
-      const buffer = new ArrayBuffer(arr.length * 4);
-      const view = new DataView(buffer);
-      arr.forEach((val, i) => {
-        view.setFloat32(i * 4, val, true); // true = little endian
-      });
-      // En Node.js podemos convertir un ArrayBuffer a Buffer y luego a base64
-      return Buffer.from(buffer).toString('base64');
-    };
-
     // Si hay una consulta de búsqueda, intentamos búsqueda híbrida Retrieve & Rank
     let queryVectorBlob = null;
     let candidateIds = [];
 
     if (query && query.trim() && openAiApiKey) {
       try {
-        // 1. Obtener embedding de la query de OpenAI
-        const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${openAiApiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            input: query.trim(),
-            model: "text-embedding-3-small"
-          })
-        });
+        // 1. Obtener embedding (desde cache o generando uno nuevo)
+        queryVectorBlob = await getQueryEmbedding(query, openAiApiKey, cacheUrl, cacheAuthToken);
 
-        if (openAiResp.ok) {
-          const openAiData = await openAiResp.json();
-          const vector = openAiData.data[0].embedding;
-          queryVectorBlob = { type: 'blob', base64: packVector(vector) };
-
+        if (queryVectorBlob) {
           // 2. Recuperar candidatos broad (OR) de FTS5
           const ftsCandidatesQuery = parseFtsCandidatesQuery(query);
           if (ftsCandidatesQuery) {

@@ -1,4 +1,5 @@
 import { registrarTelemetria } from './_lib/telemetria.js';
+import { getQueryEmbedding } from './_lib/embeddings.js';
 
 // Variables globales del Circuit Breaker (en memoria de Vercel)
 let dsFailures = 0;
@@ -111,15 +112,9 @@ export default async function handler(req, res) {
   // 1. Obtener embedding de OpenAI para la consulta del informe
   if (query && query.trim() && openAiApiKey) {
     try {
-      const openAiResp = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${openAiApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ input: query.trim(), model: "text-embedding-3-small" })
-      });
-      if (openAiResp.ok) {
-        const openAiData = await openAiResp.json();
-        queryVectorBlob = { type: 'blob', base64: packVector(openAiData.data[0].embedding) };
-
+      queryVectorBlob = await getQueryEmbedding(query, openAiApiKey, cacheUrl, cacheAuthToken);
+      
+      if (queryVectorBlob) {
         // 2. Buscar en la caché semántica
         const cacheRows = await tursoCacheQuery(
           "SELECT response_text FROM semantic_cache WHERE query_text LIKE 'report:%' AND (1.0 - vector_distance_cos(embedding, ?)) > 0.81 LIMIT 1",
