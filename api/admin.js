@@ -1,4 +1,5 @@
 import { verifyAdminAuth } from './_lib/adminAuth.js';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -35,9 +36,22 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (password === adminPassword) {
+    // Hash en SHA-256 para igualar longitudes y comparar de forma segura (Timing-Safe)
+    const inputHash = crypto.createHash('sha256').update(password || '').digest();
+    const targetHash = crypto.createHash('sha256').update(adminPassword).digest();
+
+    let isMatch = false;
+    try {
+      isMatch = crypto.timingSafeEqual(inputHash, targetHash);
+    } catch (e) {
+      isMatch = false;
+    }
+
+    if (isMatch) {
       res.status(200).json({ success: true, token: adminPassword });
     } else {
+      // Retraso artificial de 1.2 segundos para mitigar ataques de fuerza bruta
+      await new Promise(resolve => setTimeout(resolve, 1200));
       res.status(401).json({ success: false, error: "Contraseña incorrecta." });
     }
     return;
