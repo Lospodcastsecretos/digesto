@@ -89,41 +89,80 @@ export default async function handler(req, res) {
     });
   }
 
+  async function multiQuery(stmts, target = 'main') {
+    const url = target === 'cache' ? cacheTursoUrl : mainTursoUrl;
+    const token = target === 'cache' ? cacheTursoToken : mainTursoToken;
+
+    const requests = stmts.map(stmt => ({
+      type: "execute",
+      stmt: { 
+        sql: stmt.sql, 
+        args: (stmt.args || []).map(arg => {
+          if (typeof arg === 'number') return { type: 'integer', value: arg.toString() };
+          return { type: 'text', value: arg.toString() };
+        })
+      }
+    }));
+    requests.push({ type: "close" });
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests })
+    });
+    
+    if (!response.ok) throw new Error(`Turso error: ${response.status}`);
+    
+    const data = await response.json();
+    
+    return data.results.slice(0, stmts.length).map(result => {
+      if (result.type === 'error') throw new Error(result.error.message);
+      const cols = result.response.result.cols.map(c => c.name);
+      return result.response.result.rows.map(row => {
+        const obj = {};
+        cols.forEach((col, i) => { obj[col] = row[i] ? row[i].value : null; });
+        return obj;
+      });
+    });
+  }
+
   try {
     // 1. OBTENER ESTADÍSTICAS
     if (action === 'stats') {
       if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
       
-      const totalConsultasRow = await query("SELECT COUNT(*) as total FROM consultas_log");
-      const totalConsultas = totalConsultasRow[0]?.total || 0;
+      const mainStmts = [
+        { sql: "SELECT COUNT(*) as total FROM consultas_log" },
+        { sql: "SELECT COUNT(*) as hits FROM consultas_log WHERE cache_hit = 1" },
+        { sql: "SELECT * FROM consultas_log ORDER BY timestamp DESC LIMIT 20" },
+        { sql: `
+          SELECT LOWER(query_text) as tema, COUNT(*) as cantidad 
+          FROM consultas_log 
+          WHERE tipo_consulta = 'chat' 
+          GROUP BY LOWER(query_text) 
+          ORDER BY cantidad DESC 
+          LIMIT 10
+        ` },
+        { sql: "SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta" },
+        { sql: "SELECT COUNT(*) as total, SUM(CASE WHEN texto_completo IS NULL OR texto_completo = '' THEN 1 ELSE 0 END) as sin_pdf, SUM(CASE WHEN resumen IS NULL OR resumen = '' THEN 1 ELSE 0 END) as sin_resumen FROM normas" }
+      ];
 
-      const cacheHitsRow = await query("SELECT COUNT(*) as hits FROM consultas_log WHERE cache_hit = 1");
-      const cacheHits = cacheHitsRow[0]?.hits || 0;
+      // Ejecutar consultas de la base principal y la de cache en paralelo
+      const [mainResults, cacheEntries] = await Promise.all([
+        multiQuery(mainStmts, 'main'),
+        query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50", [], 'cache').catch(e => {
+          console.warn("La tabla semantic_cache no pudo ser consultada:", e);
+          return [];
+        })
+      ]);
 
+      const totalConsultas = mainResults[0][0]?.total || 0;
+      const cacheHits = mainResults[1][0]?.hits || 0;
       const cacheHitRate = totalConsultas > 0 ? ((cacheHits / totalConsultas) * 100).toFixed(1) : 0;
-
-      const ultimasConsultas = await query("SELECT * FROM consultas_log ORDER BY timestamp DESC LIMIT 20");
-
-      const topTemas = await query(`
-        SELECT LOWER(query_text) as tema, COUNT(*) as cantidad 
-        FROM consultas_log 
-        WHERE tipo_consulta = 'chat' 
-        GROUP BY LOWER(query_text) 
-        ORDER BY cantidad DESC 
-        LIMIT 10
-      `);
-
-      const porTipo = await query("SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta");
-
-      const dbStatsRow = await query("SELECT COUNT(*) as total, SUM(CASE WHEN texto_completo IS NULL OR texto_completo = '' THEN 1 ELSE 0 END) as sin_pdf, SUM(CASE WHEN resumen IS NULL OR resumen = '' THEN 1 ELSE 0 END) as sin_resumen FROM normas");
-      const dbStats = dbStatsRow[0] || { total: 0, sin_pdf: 0, sin_resumen: 0 };
-
-      let cacheEntries = [];
-      try {
-        cacheEntries = await query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50", [], 'cache');
-      } catch (e) {
-        console.warn("La tabla semantic_cache no pudo ser consultada o no existe:", e);
-      }
+      const ultimasConsultas = mainResults[2] || [];
+      const topTemas = mainResults[3] || [];
+      const porTipo = mainResults[4] || [];
+      const dbStats = mainResults[5][0] || { total: 0, sin_pdf: 0, sin_resumen: 0 };
 
       res.status(200).json({
         totalConsultas,
