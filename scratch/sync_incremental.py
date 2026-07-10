@@ -111,6 +111,90 @@ def get_openai_embedding(text):
     else:
         raise Exception(f"OpenAI Embedding Error: {resp.text}")
 
+def extraer_relaciones_legales(texto, nid, numero_origen, tipo_origen):
+    if not texto:
+        return
+    
+    fragmento = texto[:12000]
+    prompt = f"""
+Analiza el siguiente texto de la norma legal municipal ({tipo_origen} N° {numero_origen}) e identifica si realiza alguna acción legal explícita sobre otras normas anteriores.
+Acciones a identificar:
+- Deroga (de forma total): deroga en su totalidad otra norma.
+- Modifica: cambia artículos o reforma parte de otra norma.
+- Deroga parcialmente: deroga artículos específicos de otra norma.
+- Reglamenta: reglamenta la aplicación de otra norma.
+
+Debes responder ÚNICAMENTE en formato JSON con la siguiente estructura:
+{{
+  "relaciones": [
+    {{
+      "tipo_relacion": "deroga" | "modifica" | "deroga_parcialmente" | "reglamenta",
+      "numero_destino": "10309",
+      "tipo_destino": "Ordenanza" | "Decreto" | "Resolución",
+      "detalles": "Breve frase o artículo que describe la acción"
+    }}
+  ]
+}}
+
+Si no se mencionan derogaciones, modificaciones o reglamentaciones de otras normas, responde:
+{{
+  "relaciones": []
+}}
+
+Texto de la norma:
+{fragmento}
+"""
+
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": "Eres un asistente legal experto en digesto y ordenanzas municipales de Argentina."},
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": { "type": "json_object" },
+                "temperature": 0.0
+            },
+            timeout=30
+        )
+        if resp.status_code == 200:
+            res_json = resp.json()
+            raw_content = res_json["choices"][0]["message"]["content"]
+            data = json.loads(raw_content)
+            
+            for rel in data.get("relaciones", []):
+                tipo_rel = rel.get("tipo_relacion")
+                num_dest = str(rel.get("numero_destino")).strip()
+                tipo_dest = rel.get("tipo_destino")
+                detalles = rel.get("detalles")
+                
+                if not num_dest or not tipo_rel or not tipo_dest:
+                    continue
+                
+                dest_rows = turso_query("SELECT id FROM normas WHERE numero = ? AND tipo_nombre = ? LIMIT 1", [num_dest, tipo_dest])
+                if dest_rows and dest_rows[0].get("id") is not None:
+                    dest_id = dest_rows[0]["id"]
+                    print(f"   🔗 Relación detectada: {tipo_origen} {numero_origen} -> {tipo_rel.upper()} -> {tipo_dest} {num_dest} (ID: {dest_id})")
+                    
+                    sql_rel = """
+                        INSERT OR IGNORE INTO normas_relaciones (norma_origen_id, norma_destino_id, tipo_relacion, detalles)
+                        VALUES (?, ?, ?, ?)
+                    """
+                    turso_query(sql_rel, [nid, dest_id, tipo_rel, detalles])
+                    
+                    if tipo_rel == 'deroga':
+                        print(f"   🚫 Apagando flag de vigencia para {tipo_dest} {num_dest} debido a derogación.")
+                        turso_query("UPDATE normas SET vigente = 0 WHERE id = ?", [dest_id])
+    except Exception as ex:
+        print(f"   ⚠️ Falló la extracción de relaciones por IA: {ex}")
+
+
 def resolver_drive_id(filename):
     url = f"{SITE_URL}/api/documentos/{filename}"
     try:
@@ -401,6 +485,11 @@ def main():
                 if embedding:
                     embedding_str = json.dumps(embedding)
                     turso_query("UPDATE normas SET embedding = vector(?) WHERE id = ?", [embedding_str, nid])
+                    
+                # Extraer y registrar relaciones legales si hay texto completo
+                if texto_completo:
+                    print("   -> Analizando texto para extraer relaciones legales...")
+                    extraer_relaciones_legales(texto_completo, nid, num, tipo)
                     
                 print(f"   🎉 ¡{tipo} {num} sincronizada e indexada con éxito!")
                 sincronizadas += 1

@@ -158,27 +158,20 @@ export default async function handler(req, res) {
   let contextText = "No se encontraron normas específicas relacionadas con la pregunta actual.";
   let suggestedNorms = [];
   let queryVectorBlob = null;
+  let finalNormsRows = [];
+  let isAttachedMode = false;
 
-  // Modo 1: El usuario adjuntó normas específicas para hablar sobr
+  // Modo 1: El usuario adjuntó normas específicas para hablar sobre ellas
   if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
+    isAttachedMode = true;
     try {
       const placeholders = attachedNormIds.map(() => '?').join(',');
       const searchSql = `
-        SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
+        SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente
         FROM normas 
         WHERE id IN (${placeholders})
       `;
-      const normasRows = await tursoQuery(searchSql, attachedNormIds);
-      
-      if (normasRows.length > 0) {
-        contextText = "[NIVEL DE ATENCIÓN MÁXIMO] El ciudadano ha adjuntado las siguientes normas específicas para conversar sobre ellas:\n\n" + 
-        normasRows.map(n => {
-          const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
-          return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
-        }).join("\n\n---\n\n");
-
-        suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
-      }
+      finalNormsRows = await tursoQuery(searchSql, attachedNormIds);
     } catch (e) {
       console.error("Error buscando normas adjuntas:", e);
     }
@@ -212,7 +205,7 @@ export default async function handler(req, res) {
           // Búsqueda Semántica Rankeada
           const placeholders = candidateIds.map(() => '?').join(',');
           const searchSql = `
-            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo,
+            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente,
                    (1.0 - vector_distance_cos(embedding, ?)) AS vector_score
             FROM normas
             WHERE id IN (${placeholders})
@@ -223,24 +216,75 @@ export default async function handler(req, res) {
           // Fallback a sintáctico FTS5 tradicional
           const placeholders = candidateIds.map(() => '?').join(',');
           const searchSql = `
-            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo
+            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente
             FROM normas
             WHERE id IN (${placeholders}) LIMIT 5
           `;
           normasRows = await tursoQuery(searchSql, candidateIds);
         }
 
-        if (normasRows.length > 0) {
-          contextText = normasRows.map(n => {
-            const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
-            return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
-          }).join("\n\n---\n\n");
-
-          suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
-        }
+        finalNormsRows = normasRows;
       } catch (e) {
         console.error("Error buscando contexto RAG:", e);
       }
+    }
+  }
+
+  // Ahora procesamos finalNormsRows para obtener relaciones y construir contextText
+  if (finalNormsRows.length > 0) {
+    try {
+      const rowIds = finalNormsRows.map(n => n.id);
+      const placeholders = rowIds.map(() => '?').join(',');
+      const relacionesRows = await tursoQuery(`
+        SELECT r.norma_origen_id, r.norma_destino_id, r.tipo_relacion, r.detalles,
+               n_orig.numero as orig_numero, n_orig.tipo_nombre as orig_tipo,
+               n_dest.numero as dest_numero, n_dest.tipo_nombre as dest_tipo
+        FROM normas_relaciones r
+        JOIN normas n_orig ON r.norma_origen_id = n_orig.id
+        JOIN normas n_dest ON r.norma_destino_id = n_dest.id
+        WHERE r.norma_origen_id IN (${placeholders}) OR r.norma_destino_id IN (${placeholders})
+      `, [...rowIds, ...rowIds]);
+
+      const relacionesPorNorma = {};
+      relacionesRows.forEach(rel => {
+        if (rowIds.includes(rel.norma_origen_id)) {
+          if (!relacionesPorNorma[rel.norma_origen_id]) relacionesPorNorma[rel.norma_origen_id] = [];
+          relacionesPorNorma[rel.norma_origen_id].push(
+            `Esta norma ${rel.tipo_relacion.toUpperCase()} a la ${rel.dest_tipo} N° ${rel.dest_numero} (${rel.detalles || 'sin detalles'}).`
+          );
+        }
+        if (rowIds.includes(rel.norma_destino_id)) {
+          if (!relacionesPorNorma[rel.norma_destino_id]) relacionesPorNorma[rel.norma_destino_id] = [];
+          relacionesPorNorma[rel.norma_destino_id].push(
+            `Esta norma fue afectada por la ${rel.orig_tipo} N° ${rel.orig_numero} (Relación: ${rel.tipo_relacion.toUpperCase()}). Detalles: ${rel.detalles || 'sin detalles'}.`
+          );
+        }
+      });
+
+      const formatted = finalNormsRows.map(n => {
+        const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
+        const vigenciaStr = n.vigente ? "Vigente (Activa)" : "NO VIGENTE (Derogada, Modificada o Reemplazada)";
+        const relacionesNorma = relacionesPorNorma[n.id] || [];
+        const relacionesStr = relacionesNorma.length > 0 
+          ? `\nRelaciones Históricas:\n- ${relacionesNorma.join('\n- ')}` 
+          : '';
+        return `Norma: ${n.tipo_nombre} ${n.numero}\nEstado: ${vigenciaStr}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}${relacionesStr}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
+      }).join("\n\n---\n\n");
+
+      if (isAttachedMode) {
+        contextText = "[NIVEL DE ATENCIÓN MÁXIMO] El ciudadano ha adjuntado las siguientes normas específicas para conversar sobre ellas:\n\n" + formatted;
+      } else {
+        contextText = formatted;
+      }
+      suggestedNorms = finalNormsRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
+    } catch (err) {
+      console.error("Error al dar formato y resolver relaciones en Chat:", err);
+      // Fallback básico en caso de error en relaciones
+      contextText = finalNormsRows.map(n => {
+        const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
+        return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
+      }).join("\n\n---\n\n");
+      suggestedNorms = finalNormsRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
     }
   }
 

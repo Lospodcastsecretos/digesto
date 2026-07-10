@@ -92,6 +92,16 @@ export default async function handler(req, res) {
         return;
       }
       
+      const relaciones = await tursoQuery(
+        `SELECT r.tipo_relacion, r.detalles, 
+                n.id as norma_id, n.numero, n.tipo_nombre, n.vigente,
+                CASE WHEN r.norma_origen_id = ? THEN 'saliente' ELSE 'entrante' END as direccion
+         FROM normas_relaciones r
+         JOIN normas n ON (r.norma_origen_id = ? AND r.norma_destino_id = n.id) 
+                       OR (r.norma_destino_id = ? AND r.norma_origen_id = n.id)`,
+        [normaId, normaId, normaId]
+      );
+      
       const norma = rows[0];
       const textToSummarize = norma.texto_completo || norma.resumen || norma.titulo || "Sin texto disponible.";
       
@@ -100,7 +110,7 @@ export default async function handler(req, res) {
       
       // Si el resumen de IA ya existe en Turso y el hash coincide, usar el caché
       if (norma.resumen_ia && norma.resumen_ia_hash === currentHash && norma.resumen_ia.trim().length > 10) {
-        res.status(200).json({ resumen: norma.resumen_ia, cached: true, modelo: 'Caché Turso Cloud' });
+        res.status(200).json({ resumen: norma.resumen_ia, cached: true, modelo: 'Caché Turso Cloud', relaciones });
         return;
       };
       const promptNorma = `Eres un analista jurídico experto en normativas municipales de Alta Gracia.
@@ -174,7 +184,7 @@ Escribe tu resumen enfocándote en el impacto práctico de la norma. No agregues
         [resumenGenerado, currentHash, normaId]
       );
 
-      res.status(200).json({ resumen: resumenGenerado, cached: false, modelo: activeModel });
+      res.status(200).json({ resumen: resumenGenerado, cached: false, modelo: activeModel, relaciones });
       return;
     }
 
