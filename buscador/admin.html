@@ -122,7 +122,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div class="glass-card p-6 shadow-lg">
           <h3 class="text-lg font-semibold mb-4 text-gray-200">Uso por Tipo de Consulta</h3>
           <div class="relative h-64 w-full flex justify-center">
@@ -134,6 +134,36 @@
           <h3 class="text-lg font-semibold mb-4 text-gray-200">Top 10 Términos Buscados</h3>
           <div class="overflow-y-auto max-h-64 pr-2">
             <ul id="top-temas-list" class="space-y-3"></ul>
+          </div>
+        </div>
+
+        <div class="glass-card p-6 shadow-lg flex flex-col justify-between">
+          <div>
+            <h3 class="text-lg font-semibold mb-4 text-gray-200">🩺 Estado del Digesto</h3>
+            <p class="text-xs text-gray-400 mb-4">Salud de las normativas registradas en Turso DB.</p>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
+                <span class="text-gray-300 text-sm">Normativas Totales</span>
+                <span id="db-total" class="font-bold text-white text-base">0</span>
+              </div>
+              <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
+                <span class="text-gray-300 text-sm flex items-center">
+                  <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
+                  Sin Texto Extraído (PDF)
+                </span>
+                <span id="db-sin-pdf" class="font-bold text-red-400 text-base">0</span>
+              </div>
+              <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
+                <span class="text-gray-300 text-sm flex items-center">
+                  <span class="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
+                  Sin Resumen
+                </span>
+                <span id="db-sin-resumen" class="font-bold text-orange-400 text-base">0</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-[10px] text-gray-500 mt-4 text-center">
+            Escaneo en vivo de la base de datos de Alta Gracia
           </div>
         </div>
       </div>
@@ -310,6 +340,12 @@
       document.getElementById('kpi-hits').textContent = data.cacheHits || 0;
       document.getElementById('kpi-misses').textContent = data.cacheMisses || 0;
       document.getElementById('kpi-rate').textContent = `${data.cacheHitRate || 0}%`;
+
+      // Cargar diagnóstico de base de datos
+      const dbStats = data.dbStats || { total: 0, sin_pdf: 0, sin_resumen: 0 };
+      document.getElementById('db-total').textContent = Number(dbStats.total).toLocaleString('es-AR');
+      document.getElementById('db-sin-pdf').textContent = dbStats.sin_pdf || 0;
+      document.getElementById('db-sin-resumen').textContent = dbStats.sin_resumen || 0;
 
       const ctx = document.getElementById('chartTipos').getContext('2d');
       const tiposData = data.porTipo || [];

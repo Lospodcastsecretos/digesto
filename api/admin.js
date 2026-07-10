@@ -109,6 +109,9 @@ export default async function handler(req, res) {
 
       const porTipo = await query("SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta");
 
+      const dbStatsRow = await query("SELECT COUNT(*) as total, SUM(CASE WHEN texto_completo IS NULL OR texto_completo = '' THEN 1 ELSE 0 END) as sin_pdf, SUM(CASE WHEN resumen IS NULL OR resumen = '' THEN 1 ELSE 0 END) as sin_resumen FROM normas");
+      const dbStats = dbStatsRow[0] || { total: 0, sin_pdf: 0, sin_resumen: 0 };
+
       let cacheEntries = [];
       try {
         cacheEntries = await query("SELECT rowid, query_text, response_text FROM semantic_cache LIMIT 50");
@@ -124,7 +127,8 @@ export default async function handler(req, res) {
         actividadReciente: ultimasConsultas,
         topTemas,
         porTipo,
-        cacheEntries
+        cacheEntries,
+        dbStats
       });
       return;
     }
