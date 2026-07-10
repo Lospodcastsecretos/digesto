@@ -145,22 +145,23 @@
             <div class="space-y-3">
               <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
                 <span class="text-gray-300 text-sm">Normativas Totales</span>
-                <span id="db-total" class="font-bold text-white text-base">0</span>
+                <span id="db-total" class="font-bold text-white text-base animate-pulse">Cargando...</span>
               </div>
               <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
                 <span class="text-gray-300 text-sm flex items-center">
                   <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
                   Sin Texto Extraído (PDF)
                 </span>
-                <span id="db-sin-pdf" class="font-bold text-red-400 text-base">0</span>
+                <span id="db-sin-pdf" class="font-bold text-red-400 text-base animate-pulse">...</span>
               </div>
               <div class="flex justify-between items-center bg-gray-800/40 p-3 rounded border border-gray-700">
                 <span class="text-gray-300 text-sm flex items-center">
                   <span class="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
                   Sin Resumen
                 </span>
-                <span id="db-sin-resumen" class="font-bold text-orange-400 text-base">0</span>
+                <span id="db-sin-resumen" class="font-bold text-orange-400 text-base animate-pulse">...</span>
               </div>
+            </div>
             </div>
           </div>
           <div class="text-[10px] text-gray-500 mt-4 text-center">
@@ -252,6 +253,7 @@
       if (currentToken) {
         showDashboard();
         fetchStats();
+        fetchDiagnose();
       }
     });
 
@@ -273,6 +275,7 @@
           localStorage.setItem('digesto_admin_token', currentToken);
           showDashboard();
           fetchStats();
+          fetchDiagnose();
         } else {
           errEl.textContent = data.error || "Error de autenticación";
           errEl.classList.remove('hidden');
@@ -359,17 +362,42 @@
       }
     }
 
+    async function fetchDiagnose() {
+      const totalEl = document.getElementById('db-total');
+      const pdfEl = document.getElementById('db-sin-pdf');
+      const resumenEl = document.getElementById('db-sin-resumen');
+
+      totalEl.classList.add('animate-pulse');
+      pdfEl.classList.add('animate-pulse');
+      resumenEl.classList.add('animate-pulse');
+
+      try {
+        const res = await fetch('/api/admin?action=diagnose', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const dbStats = data.dbStats || { total: 0, sin_pdf: 0, sin_resumen: 0 };
+          
+          totalEl.textContent = Number(dbStats.total).toLocaleString('es-AR');
+          pdfEl.textContent = dbStats.sin_pdf || 0;
+          resumenEl.textContent = dbStats.sin_resumen || 0;
+        }
+      } catch (err) {
+        console.error("Error fetching diagnosis:", err);
+        totalEl.textContent = "Error";
+      } finally {
+        totalEl.classList.remove('animate-pulse');
+        pdfEl.classList.remove('animate-pulse');
+        resumenEl.classList.remove('animate-pulse');
+      }
+    }
+
     function renderDashboard(data) {
       document.getElementById('kpi-total').textContent = data.totalConsultas || 0;
       document.getElementById('kpi-hits').textContent = data.cacheHits || 0;
       document.getElementById('kpi-misses').textContent = data.cacheMisses || 0;
       document.getElementById('kpi-rate').textContent = `${data.cacheHitRate || 0}%`;
-
-      // Cargar diagnóstico de base de datos
-      const dbStats = data.dbStats || { total: 0, sin_pdf: 0, sin_resumen: 0 };
-      document.getElementById('db-total').textContent = Number(dbStats.total).toLocaleString('es-AR');
-      document.getElementById('db-sin-pdf').textContent = dbStats.sin_pdf || 0;
-      document.getElementById('db-sin-resumen').textContent = dbStats.sin_resumen || 0;
 
       const ctx = document.getElementById('chartTipos').getContext('2d');
       const tiposData = data.porTipo || [];

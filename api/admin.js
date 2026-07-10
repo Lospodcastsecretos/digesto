@@ -127,7 +127,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. OBTENER ESTADÍSTICAS
+    // 1. OBTENER ESTADÍSTICAS (Rápido)
     if (action === 'stats') {
       if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
       
@@ -143,8 +143,7 @@ export default async function handler(req, res) {
           ORDER BY cantidad DESC 
           LIMIT 10
         ` },
-        { sql: "SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta" },
-        { sql: "SELECT COUNT(*) as total, SUM(CASE WHEN texto_completo IS NULL OR texto_completo = '' THEN 1 ELSE 0 END) as sin_pdf, SUM(CASE WHEN resumen IS NULL OR resumen = '' THEN 1 ELSE 0 END) as sin_resumen FROM normas" }
+        { sql: "SELECT tipo_consulta, COUNT(*) as cantidad FROM consultas_log GROUP BY tipo_consulta" }
       ];
 
       // Ejecutar consultas de la base principal y la de cache en paralelo
@@ -162,7 +161,6 @@ export default async function handler(req, res) {
       const ultimasConsultas = mainResults[2] || [];
       const topTemas = mainResults[3] || [];
       const porTipo = mainResults[4] || [];
-      const dbStats = mainResults[5][0] || { total: 0, sin_pdf: 0, sin_resumen: 0 };
 
       res.status(200).json({
         totalConsultas,
@@ -172,9 +170,25 @@ export default async function handler(req, res) {
         actividadReciente: ultimasConsultas,
         topTemas,
         porTipo,
-        cacheEntries,
-        dbStats
+        cacheEntries
       });
+      return;
+    }
+
+    // 1b. DIAGNÓSTICO DEL DIGESTO (Consulta pesada optimizada)
+    if (action === 'diagnose') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      
+      const rows = await query(`
+        SELECT 
+          COUNT(*) as total, 
+          SUM(CASE WHEN archivo_pdf IS NULL OR archivo_pdf = '' OR archivo_pdf = 'sin_archivo_fisico' THEN 1 ELSE 0 END) as sin_pdf, 
+          SUM(CASE WHEN resumen IS NULL OR resumen = '' THEN 1 ELSE 0 END) as sin_resumen 
+        FROM normas
+      `);
+      
+      const dbStats = rows[0] || { total: 0, sin_pdf: 0, sin_resumen: 0 };
+      res.status(200).json({ dbStats });
       return;
     }
 
