@@ -207,7 +207,7 @@
       const errEl = document.getElementById('login-error');
       
       try {
-        const res = await fetch('/api/admin-login', {
+        const res = await fetch('/api/admin?action=login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password: pass })
@@ -242,7 +242,7 @@
 
     async function exportToCSV() {
       try {
-        const res = await fetch('/api/admin-export-csv', {
+        const res = await fetch('/api/admin?action=export-csv', {
           headers: { 'Authorization': `Bearer ${currentToken}` }
         });
         if (res.status === 401) {
@@ -285,7 +285,7 @@
       document.getElementById('loading').classList.remove('hidden');
 
       try {
-        const res = await fetch('/api/admin-estadisticas', {
+        const res = await fetch('/api/admin?action=stats', {
           headers: { 'Authorization': `Bearer ${currentToken}` }
         });
         
@@ -411,7 +411,7 @@
       if (!confirm(`¿Estás seguro de que deseas borrar la respuesta #${rowid} del caché?`)) return;
       
       try {
-        const res = await fetch('/api/admin-cache-delete', {
+        const res = await fetch('/api/admin?action=cache-delete', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -435,7 +435,7 @@
       if (!confirm("⚠️ PELIGRO: ¿Estás seguro de que deseas vaciar TODO el caché semántico?\n\nLa IA olvidará todas las respuestas guardadas y tendrá que volver a pensar cada pregunta (lo que incrementará ligeramente los costos temporales).")) return;
       
       try {
-        const res = await fetch('/api/admin-cache-clear', {
+        const res = await fetch('/api/admin?action=cache-clear', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
