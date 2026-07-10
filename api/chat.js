@@ -142,8 +142,7 @@ export default async function handler(req, res) {
   let suggestedNorms = [];
   let queryVectorBlob = null;
 
-  // Modo 1: El usuario adjuntó normas específicas para hablar sobre ellas
-  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
+  // Modo 1: El usuario adjuntó normas específicas para hablar sobr  if (attachedNormIds && Array.isArray(attachedNormIds) && attachedNormIds.length > 0) {
     try {
       const placeholders = attachedNormIds.map(() => '?').join(',');
       const searchSql = `
@@ -157,7 +156,7 @@ export default async function handler(req, res) {
         contextText = "[NIVEL DE ATENCIÓN MÁXIMO] El ciudadano ha adjuntado las siguientes normas específicas para conversar sobre ellas:\n\n" + 
         normasRows.map(n => {
           const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
-          return `ID de la Norma: ${n.id}\nNorma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
+          return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
         }).join("\n\n---\n\n");
 
         suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
@@ -230,7 +229,7 @@ export default async function handler(req, res) {
         if (normasRows.length > 0) {
           contextText = normasRows.map(n => {
             const textoDetalle = (n.texto_completo || n.resumen || "").substring(0, 1500);
-            return `ID de la Norma: ${n.id}\nNorma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
+            return `Norma: ${n.tipo_nombre} ${n.numero}\nFecha: ${n.fecha}\nTítulo: ${n.titulo}\nTexto de la Norma (Fragmento amplio):\n${textoDetalle}...`;
           }).join("\n\n---\n\n");
 
           suggestedNorms = normasRows.map(n => ({ id: n.id, numero: n.numero, tipo_nombre: n.tipo_nombre, titulo: n.titulo }));
@@ -254,14 +253,9 @@ export default async function handler(req, res) {
 REGLAS DE COMPORTAMIENTO:
 1. Sé amable, directo y evita lenguaje excesivamente técnico si no es necesario.
 2. Si la base de datos te provee contexto (normas encontradas), basa tu respuesta ESTRICTAMENTE en esa información. Cita el número de norma (ej. "Según la Ordenanza 1234...").
-3. OBLIGATORIO: Siempre que menciones, cites o te bases en una norma de la base de datos, debes crear un enlace directo (Deep Link) en formato Markdown apuntando al fragmento de texto exacto del que extrajiste la información.
-   * Formato del enlace: [Nombre de la Norma](https://digestoaltagracia.com.ar/#/detalles/{ID_DE_LA_NORMA}:~:text={TEXT_FRAGMENT})
-   * El {ID_DE_LA_NORMA} se obtiene del campo "ID de la Norma" provisto en el contexto.
-   * El {TEXT_FRAGMENT} debe ser una frase literal, única y corta de entre 3 a 5 palabras del texto original de esa norma que respalda lo que estás diciendo (ej. si citas un artículo de exención, usa fragmento de texto como "exencion%20del%20pago%20de"). Reemplaza los espacios con %20.
-   * Ejemplo de enlace: [Ordenanza N° 8595](https://digestoaltagracia.com.ar/#/detalles/8595:~:text=exencion%20del%20pago%20de)
-4. Si la base de datos NO provee información sobre la pregunta, indica amablemente que no tienes información exacta sobre ese tema en el digesto actual, pero ofrece ayuda con otros temas. No inventes leyes.
-5. Usa formato Markdown (negritas para destacar cosas importantes, viñetas para listas) para que sea fácil de leer.
-6. Mantén tus respuestas relativamente cortas (máximo 2-3 párrafos cortos). No te presentes con tu nombre a menos que el usuario te pregunte quién eres.
+3. Si la base de datos NO provee información sobre la pregunta, indica amablemente que no tienes información exacta sobre ese tema en el digesto actual, pero ofrece ayuda con otros temas. No inventes leyes.
+4. Usa formato Markdown (negritas para destacar cosas importantes, viñetas para listas) para que sea fácil de leer.
+5. Mantén tus respuestas relativamente cortas (máximo 2-3 párrafos cortos). No te presentes con tu nombre a menos que el usuario te pregunte quién eres.`;
 
 CONTEXTO DE NORMAS ENCONTRADAS PARA LA PREGUNTA ACTUAL:
 ${contextText}
