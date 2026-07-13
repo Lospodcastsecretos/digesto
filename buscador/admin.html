@@ -577,14 +577,20 @@
           return;
         }
 
+        const getAnio = (f) => {
+          if (!f) return '';
+          const match = f.match(/\d{4}/);
+          return match ? match[0] : f;
+        };
+
         container.innerHTML = rows.map(r => `
           <div class="revisor-card bg-gray-800 p-4 rounded border border-gray-700 shadow flex flex-col gap-3 transition-opacity duration-300" data-id="${r.id}">
             <div class="flex justify-between items-start">
               <div class="text-sm">
-                <span class="font-bold text-blue-400">${r.origen_tipo} N° ${r.origen_numero}</span> <span class="text-gray-500">(${r.origen_anio})</span>
+                <span class="font-bold text-blue-400">${r.origen_tipo} N° ${r.origen_numero}</span> <span class="text-gray-500">(${getAnio(r.origen_fecha)})</span>
                 <span class="mx-2 text-gray-400">➡️ <span class="font-bold uppercase text-white">${r.tipo_relacion}</span> ➡️</span>
                 <span class="font-bold text-yellow-400 cursor-pointer hover:underline" onclick="window.open('/documento.html?id=${r.destino_numero}&tipo=${r.destino_tipo}', '_blank')">${r.destino_tipo} N° ${r.destino_numero}</span>
-                ${r.destino_anio ? `<span class="text-gray-500">(${r.destino_anio})</span>` : ''}
+                ${r.destino_fecha ? `<span class="text-gray-500">(${getAnio(r.destino_fecha)})</span>` : ''}
                 ${r.articulo_afectado ? `<code class="bg-gray-900 px-1 py-0.5 rounded text-xs ml-1 text-pink-300">${r.articulo_afectado}</code>` : ''}
               </div>
               <div class="text-xs font-mono px-2 py-1 rounded ${r.confianza > 0.8 ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">

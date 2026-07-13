@@ -263,10 +263,10 @@ export default async function handler(req, res) {
           r.fragmento_original,
           r.justificacion,
           o.numero as origen_numero,
-          o.anio as origen_anio,
+          o.fecha as origen_fecha,
           o.tipo_nombre as origen_tipo,
           COALESCE(d.numero, r.destino_numero_texto) as destino_numero,
-          d.anio as destino_anio,
+          d.fecha as destino_fecha,
           COALESCE(d.tipo_nombre, r.destino_tipo_texto) as destino_tipo
         FROM normas_relaciones r
         JOIN normas o ON r.norma_origen_id = o.id
