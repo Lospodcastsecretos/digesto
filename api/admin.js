@@ -265,9 +265,11 @@ export default async function handler(req, res) {
           o.numero as origen_numero,
           o.fecha as origen_fecha,
           o.tipo_nombre as origen_tipo,
+          o.archivo_pdf as origen_pdf,
           COALESCE(d.numero, r.destino_numero_texto) as destino_numero,
           d.fecha as destino_fecha,
-          COALESCE(d.tipo_nombre, r.destino_tipo_texto) as destino_tipo
+          COALESCE(d.tipo_nombre, r.destino_tipo_texto) as destino_tipo,
+          d.archivo_pdf as destino_pdf
         FROM normas_relaciones r
         JOIN normas o ON r.norma_origen_id = o.id
         LEFT JOIN normas d ON r.norma_destino_id = d.id

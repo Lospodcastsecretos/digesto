@@ -583,13 +583,22 @@
           return match ? match[0] : f;
         };
 
+        const renderLink = (tipo, numero, pdf, colorClass) => {
+          const text = `${tipo} N° ${numero}`;
+          if (pdf && pdf !== 'sin_archivo_fisico') {
+            const url = `https://raw.githubusercontent.com/Lospodcastsecretos/digesto-documentos/main/${pdf}`;
+            return `<a href="${url}" target="_blank" class="font-bold ${colorClass} hover:underline" title="Ver PDF">${text}</a>`;
+          }
+          return `<span class="font-bold text-gray-500" title="Sin archivo físico">${text}</span>`;
+        };
+
         container.innerHTML = rows.map(r => `
           <div class="revisor-card bg-gray-800 p-4 rounded border border-gray-700 shadow flex flex-col gap-3 transition-opacity duration-300" data-id="${r.id}">
             <div class="flex justify-between items-start">
               <div class="text-sm">
-                <span class="font-bold text-blue-400">${r.origen_tipo} N° ${r.origen_numero}</span> <span class="text-gray-500">(${getAnio(r.origen_fecha)})</span>
+                ${renderLink(r.origen_tipo, r.origen_numero, r.origen_pdf, 'text-blue-400')} <span class="text-gray-500">(${getAnio(r.origen_fecha)})</span>
                 <span class="mx-2 text-gray-400">➡️ <span class="font-bold uppercase text-white">${r.tipo_relacion}</span> ➡️</span>
-                <span class="font-bold text-yellow-400 cursor-pointer hover:underline" onclick="window.open('/documento.html?id=${r.destino_numero}&tipo=${r.destino_tipo}', '_blank')">${r.destino_tipo} N° ${r.destino_numero}</span>
+                ${renderLink(r.destino_tipo, r.destino_numero, r.destino_pdf, 'text-yellow-400')}
                 ${r.destino_fecha ? `<span class="text-gray-500">(${getAnio(r.destino_fecha)})</span>` : ''}
                 ${r.articulo_afectado ? `<code class="bg-gray-900 px-1 py-0.5 rounded text-xs ml-1 text-pink-300">${r.articulo_afectado}</code>` : ''}
               </div>
