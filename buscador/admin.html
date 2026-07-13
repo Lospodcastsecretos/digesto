@@ -93,7 +93,6 @@
       <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab(event, 'tab-dashboard')">📊 Dashboard</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-cache')">🧠 Control de Caché</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-simulador')">🧪 Modo Pruebas</button>
-      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-relaciones'); cargarRelaciones();">⚖️ Relaciones Legales</button>
     </div>
 
     <!-- Estado de Carga -->
@@ -245,48 +244,6 @@
       </div>
     </div>
 
-    <!-- TAB: Relaciones Legales -->
-    <div id="tab-relaciones" class="tab-content">
-      <div class="glass-card p-6 shadow-lg mb-6">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <h3 class="text-xl font-semibold text-gray-200">⚖️ Revisión de Relaciones Legales</h3>
-            <p class="text-xs text-gray-400 mt-1">Relaciones detectadas por IA. Confirmalas o recházalas antes de mostrarlas al público.</p>
-          </div>
-          <div class="flex gap-3">
-            <button onclick="setEstadoRelaciones('pendiente')" id="btn-rel-pendiente" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold text-sm text-white transition">⏳ Pendientes</button>
-            <button onclick="setEstadoRelaciones('confirmado')" id="btn-rel-confirmado" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-semibold text-sm text-white transition">✅ Confirmadas</button>
-            <button onclick="setEstadoRelaciones('rechazado')" id="btn-rel-rechazado" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-semibold text-sm text-white transition">❌ Rechazadas</button>
-          </div>
-        </div>
-
-        <div id="rel-stats" class="text-sm text-gray-400 mb-4"></div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left text-gray-400 border-b border-gray-700">
-                <th class="pb-3 pr-4">Norma Origen (Analizada)</th>
-                <th class="pb-3 pr-4">Relación</th>
-                <th class="pb-3 pr-4">Norma Afectada / Destino</th>
-                <th class="pb-3 pr-4">Justificación (Extracto del PDF)</th>
-                <th class="pb-3">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="rel-table-body" class="text-sm">
-              <tr><td colspan="5" class="py-8 text-center text-gray-500">Cargando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Paginación -->
-        <div class="flex justify-between items-center mt-4">
-          <button id="rel-prev" onclick="cambiarPaginaRelaciones(-1)" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm disabled:opacity-40" disabled>← Anterior</button>
-          <span id="rel-page-info" class="text-gray-400 text-sm"></span>
-          <button id="rel-next" onclick="cambiarPaginaRelaciones(1)" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm disabled:opacity-40" disabled>Siguiente →</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <script>
@@ -673,146 +630,6 @@
       }
     });
 
-    // ═══════════════════════════════════════════════════════════════════
-    // RELACIONES LEGALES — Revisión humana de relaciones detectadas por IA
-    // ═══════════════════════════════════════════════════════════════════
-    let relCurrentPage = 1;
-    let relCurrentEstado = 'pendiente';
-    let relTotalPages = 1;
-
-    function setEstadoRelaciones(estado) {
-      relCurrentEstado = estado;
-      relCurrentPage = 1;
-      // Actualizar estilos de botones
-      ['pendiente', 'confirmado', 'rechazado'].forEach(e => {
-        const btn = document.getElementById(`btn-rel-${e}`);
-        if (e === estado) {
-          btn.className = btn.className.replace('bg-gray-700 hover:bg-gray-600', 
-            e === 'pendiente' ? 'bg-yellow-600 hover:bg-yellow-700' : 
-            e === 'confirmado' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700');
-        } else {
-          btn.className = btn.className
-            .replace('bg-yellow-600 hover:bg-yellow-700', 'bg-gray-700 hover:bg-gray-600')
-            .replace('bg-green-600 hover:bg-green-700', 'bg-gray-700 hover:bg-gray-600')
-            .replace('bg-red-600 hover:bg-red-700', 'bg-gray-700 hover:bg-gray-600');
-        }
-      });
-      cargarRelaciones();
-    }
-
-    function cambiarPaginaRelaciones(delta) {
-      const nuevaPagina = relCurrentPage + delta;
-      if (nuevaPagina < 1 || nuevaPagina > relTotalPages) return;
-      relCurrentPage = nuevaPagina;
-      cargarRelaciones();
-    }
-
-    async function cargarRelaciones() {
-      const tbody = document.getElementById('rel-table-body');
-      tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-500">⏳ Cargando...</td></tr>';
-
-      try {
-        const resp = await fetch(`/api/admin-relaciones?estado=${relCurrentEstado}&page=${relCurrentPage}`, {
-          headers: { 'Authorization': `Bearer ${currentToken}` }
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Error al cargar relaciones');
-
-        const { relaciones, pagination } = data;
-        relTotalPages = pagination.pages || 1;
-
-        // Actualizar paginación
-        document.getElementById('rel-page-info').textContent = 
-          `Página ${pagination.page} de ${pagination.pages} (${pagination.total} total)`;
-        document.getElementById('rel-prev').disabled = pagination.page <= 1;
-        document.getElementById('rel-next').disabled = pagination.page >= pagination.pages;
-
-        if (!relaciones || relaciones.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-gray-500">
-            ${relCurrentEstado === 'pendiente' ? '✅ No hay relaciones pendientes de revisión.' : 'Sin resultados para este filtro.'}
-          </td></tr>`;
-          document.getElementById('rel-stats').textContent = `${pagination.total} relación(es) ${relCurrentEstado}(s)`;
-          return;
-        }
-
-        document.getElementById('rel-stats').textContent = 
-          `${pagination.total} relación(es) ${relCurrentEstado}(s) — mostrando ${relaciones.length} en esta página`;
-
-        tbody.innerHTML = relaciones.map(rel => {
-          const tipoColor = rel.tipo_relacion === 'deroga' ? 'text-red-400' :
-                            rel.tipo_relacion === 'modifica' ? 'text-yellow-400' :
-                            rel.tipo_relacion === 'complementa' ? 'text-blue-400' : 'text-purple-400';
-          const confianzaColor = rel.confianza >= 0.8 ? 'text-green-400' :
-                                 rel.confianza >= 0.5 ? 'text-yellow-400' : 'text-red-400';
-          const destNorma = rel.destino_numero ? 
-            `${rel.destino_tipo} N° ${rel.destino_numero}` : 
-            `${rel.destino_tipo_texto || '?'} N° ${rel.destino_numero_texto || '?'} <span class="text-xs text-gray-500">(sin match)</span>`;
-
-          const acciones = relCurrentEstado === 'pendiente' ? `
-            <div class="flex gap-2">
-              <button onclick="revisarRelacion(${rel.id}, 'confirmar')"
-                class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-xs font-semibold text-white transition">
-                ✓ Confirmar
-              </button>
-              <button onclick="revisarRelacion(${rel.id}, 'rechazar')"
-                class="px-3 py-1 bg-red-700 hover:bg-red-800 rounded text-xs font-semibold text-white transition">
-                ✗ Rechazar
-              </button>
-            </div>
-          ` : `<span class="text-gray-500 text-xs">${relCurrentEstado === 'confirmado' ? '✅ Confirmada' : '❌ Rechazada'}</span>`;
-
-          return `
-            <tr class="border-b border-gray-800 hover:bg-gray-800 transition">
-              <td class="py-3 pr-4">
-                <div class="font-medium">
-                  ${rel.origen_pdf ? 
-                    `<a href="https://raw.githubusercontent.com/Lospodcastsecretos/digesto-documentos/main/${rel.origen_pdf}" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline font-semibold flex items-center gap-1">
-                      ${rel.origen_tipo} N° ${rel.origen_numero}
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </a>` : 
-                    `<span class="text-white">${rel.origen_tipo} N° ${rel.origen_numero}</span>`
-                  }
-                </div>
-                <div class="text-xs text-gray-500">${rel.origen_fecha || ''}</div>
-              </td>
-              <td class="py-3 pr-4">
-                <span class="font-bold uppercase text-xs ${tipoColor}">${rel.tipo_relacion}</span>
-              </td>
-              <td class="py-3 pr-4">
-                <div class="text-gray-200 font-semibold">${destNorma}</div>
-                ${rel.articulo_afectado ? `<div class="text-xs text-blue-400 font-medium" style="margin-top:2px;">Afecta: ${rel.articulo_afectado}</div>` : '<div class="text-xs text-gray-500" style="margin-top:2px;">Afectación Total</div>'}
-              </td>
-              <td class="py-3 pr-4 text-gray-300 text-xs italic" style="max-width: 400px; white-space: normal; word-break: break-word; line-height: 1.4;">
-                ${rel.justificacion ? `"${rel.justificacion}"` : '<span class="text-gray-600">-</span>'}
-              </td>
-              <td class="py-3">${acciones}</td>
-            </tr>
-          `;
-        }).join('');
-
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">❌ Error: ${err.message}</td></tr>`;
-      }
-    }
-
-    async function revisarRelacion(id, accion) {
-      try {
-        const resp = await fetch('/api/admin-relaciones', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentToken}`
-          },
-          body: JSON.stringify({ id, accion })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Error al procesar');
-        // Recargar la tabla después de la acción
-        cargarRelaciones();
-      } catch (err) {
-        alert(`Error: ${err.message}`);
-      }
-    }
   </script>
 </body>
 </html>

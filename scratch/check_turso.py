@@ -26,18 +26,16 @@ def turso_query(sql, args=[]):
         print(f"Network/HTTP Exception: {e}")
         raise e
 
-print("Calculando avance global de vectorizacion...")
+print("Verificando si la tabla 'semantic_cache' ya existe en Turso...")
 try:
-    res_total = turso_query("SELECT count(*) FROM normas")
-    total = res_total["results"][0]["response"]["result"]["rows"][0][0]["value"]
-    
-    res_vect = turso_query("SELECT count(*) FROM normas WHERE embedding IS NOT NULL")
-    vect = res_vect["results"][0]["response"]["result"]["rows"][0][0]["value"]
-    
-    porcentaje = (vect / total) * 100 if total > 0 else 0
-    print(f"PROGRESS_DATA: Total: {total}, Vectorizadas: {vect}, Porcentaje: {porcentaje:.2f}%")
+    res = turso_query("SELECT name FROM sqlite_master WHERE type='table' AND name='semantic_cache'")
+    rows = res["results"][0]["response"]["result"]["rows"]
+    if len(rows) > 0:
+        print("INFO: La tabla 'semantic_cache' ya existe en la base de datos.")
+    else:
+        print("INFO: La tabla 'semantic_cache' NO existe en la base de datos.")
 except Exception as e:
-    print(f"ERROR: Fallo al calcular avance: {e}")
+    print(f"ERROR al consultar la existencia de la tabla: {e}")
 
 print("Intentando liberar bloqueos enviando un ROLLBACK explícito...")
 try:

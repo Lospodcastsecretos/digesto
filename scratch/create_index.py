@@ -21,10 +21,11 @@ headers = {
 
 payload = {
     "requests": [
-        {"type": "execute", "stmt": {"sql": "CREATE INDEX IF NOT EXISTS idx_normas_num_tipo ON normas(numero, tipo_nombre)", "args": []}},
+        {"type": "execute", "stmt": {"sql": "CREATE INDEX IF NOT EXISTS idx_normas_archivo_pdf ON normas(archivo_pdf)", "args": []}},
         {"type": "close"}
     ]
 }
 
-r = requests.post(f"{TURSO_URL}/v2/pipeline", headers=headers, json=payload)
+clean_url = TURSO_URL.replace("libsql://", "https://").replace("http://", "https://")
+r = requests.post(f"{clean_url}/v2/pipeline", headers=headers, json=payload)
 print("CREATE INDEX RESPONSE:", r.text)
