@@ -1132,12 +1132,41 @@
                 if (!resp.ok) throw new Error(data.error || 'Error al obtener resumen');
                 
                 const cacheInfo = data.cached ? '⚡ (Cargado desde caché)' : '🤖 (Generado ahora)';
+                
+                let relacionesHtml = '';
+                if (data.relaciones && data.relaciones.length > 0) {
+                    relacionesHtml = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
+                            <span style="font-size: 0.85em; font-weight: bold; color: #3b82f6; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Relaciones de Vigencia e Historial:</span>
+                            <ul style="margin: 0; padding-left: 16px; font-size: 0.9em; color: rgba(255,255,255,0.85); list-style-type: disc;">
+                    `;
+                    data.relaciones.forEach(rel => {
+                        const icon = rel.tipo_relacion === 'deroga' ? '🚫' : (rel.tipo_relacion === 'modifica' ? '📝' : '🔗');
+                        const actionText = rel.tipo_relacion === 'deroga' ? 'DEROGA' : (rel.tipo_relacion === 'modifica' ? 'MODIFICA' : rel.tipo_relacion.toUpperCase());
+                        const text = rel.direccion === 'saliente' 
+                            ? `Esta norma <strong>${actionText}</strong> a la ${rel.tipo_nombre} N° ${rel.numero}`
+                            : `Esta norma fue <strong>afectada (${actionText})</strong> por la ${rel.tipo_nombre} N° ${rel.numero}`;
+                        const detailStr = rel.detalles ? ` - <em>"${rel.detalles}"</em>` : '';
+                        
+                        relacionesHtml += `
+                            <li style="margin-bottom: 6px; line-height: 1.4;">
+                                ${icon} ${text}${detailStr}
+                            </li>
+                        `;
+                    });
+                    relacionesHtml += `
+                            </ul>
+                        </div>
+                    `;
+                }
+
                 textDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-size: 0.8em; color: var(--text-muted);">
                         <span>${cacheInfo}</span>
                         <span>Modelo: ${data.modelo}</span>
                     </div>
                     <p style="margin: 0; line-height: 1.5; color: white;">${data.resumen.replace(/\n/g, '<br>')}</p>
+                    ${relacionesHtml}
                 `;
             } catch (err) {
                 console.error(err);
