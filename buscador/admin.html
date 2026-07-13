@@ -270,12 +270,13 @@
                 <th class="pb-3 pr-4">Tipo</th>
                 <th class="pb-3 pr-4">Norma Destino</th>
                 <th class="pb-3 pr-4">Artículo</th>
+                <th class="pb-3 pr-4">Justificación / Extracto</th>
                 <th class="pb-3 pr-4">Confianza</th>
                 <th class="pb-3">Acciones</th>
               </tr>
             </thead>
             <tbody id="rel-table-body" class="text-sm">
-              <tr><td colspan="6" class="py-8 text-center text-gray-500">Cargando...</td></tr>
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -776,6 +777,9 @@
                 <div class="text-xs text-gray-500">${rel.destino_fecha || ''}</div>
               </td>
               <td class="py-3 pr-4 text-gray-300 text-xs">${rel.articulo_afectado || '<em class="text-gray-500">Total</em>'}</td>
+              <td class="py-3 pr-4 text-gray-400 text-xs max-w-[240px] truncate" title="${rel.justificacion || ''}">
+                ${rel.justificacion || '<span class="text-gray-600">-</span>'}
+              </td>
               <td class="py-3 pr-4 font-bold ${confianzaColor}">${parseFloat(rel.confianza).toFixed(2)}</td>
               <td class="py-3">${acciones}</td>
             </tr>
@@ -783,7 +787,7 @@
         }).join('');
 
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-400">❌ Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">❌ Error: ${err.message}</td></tr>`;
       }
     }
 

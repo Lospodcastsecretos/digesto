@@ -183,6 +183,7 @@ Responde ÚNICAMENTE con un objeto JSON con una clave "relaciones" que contenga 
   "norma_destino_tipo": "Ordenanza" | "Decreto" | "Resolución",
   "norma_destino_numero": "string, solo el número",
   "articulo_afectado": "string o null si es derogación/afectación total",
+  "justificacion": "Cita textual del fragmento del texto original que demuestra esta relación (máx. 160 caracteres)",
   "confianza": número entre 0.0 y 1.0
 }}
 
@@ -381,6 +382,7 @@ def main():
                 dest_tipo = rel.get("norma_destino_tipo", "Ordenanza")
                 dest_numero = str(rel.get("norma_destino_numero", "")).strip()
                 articulo = rel.get("articulo_afectado") or None
+                justificacion = rel.get("justificacion") or None
                 confianza = float(rel.get("confianza", 0.5))
                 confianza = max(0.0, min(1.0, confianza))
 
@@ -393,9 +395,9 @@ def main():
                     turso_execute(
                         """INSERT INTO normas_relaciones 
                            (norma_origen_id, norma_destino_id, destino_numero_texto, destino_tipo_texto,
-                            tipo_relacion, articulo_afectado, texto_nuevo, confianza, revisado_humano)
-                           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0)""",
-                        [norma_id, dest_id, dest_numero, dest_tipo, tipo, articulo, confianza]
+                            tipo_relacion, articulo_afectado, texto_nuevo, confianza, revisado_humano, justificacion)
+                           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, ?)""",
+                        [norma_id, dest_id, dest_numero, dest_tipo, tipo, articulo, confianza, justificacion]
                     )
                     relaciones_count += 1
 

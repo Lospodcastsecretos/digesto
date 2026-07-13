@@ -96,7 +96,7 @@ export default async function handler(req, res) {
         tursoQuery(`
           SELECT 
             r.id, r.tipo_relacion, r.articulo_afectado, r.confianza, r.revisado_humano,
-            r.destino_numero_texto, r.destino_tipo_texto, r.creado_en,
+            r.destino_numero_texto, r.destino_tipo_texto, r.creado_en, r.justificacion,
             n_orig.numero as origen_numero, n_orig.tipo_nombre as origen_tipo, n_orig.fecha as origen_fecha,
             n_dest.numero as destino_numero, n_dest.tipo_nombre as destino_tipo, n_dest.fecha as destino_fecha,
             n_dest.id as destino_id
