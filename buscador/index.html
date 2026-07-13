@@ -1168,10 +1168,82 @@
                     <p style="margin: 0; line-height: 1.5; color: white;">${data.resumen.replace(/\n/g, '<br>')}</p>
                     ${relacionesHtml}
                 `;
+
+                // ── Consultar estado de consolidación ──────────────────────────
+                try {
+                    const consolidadoResp = await fetch(`/api/consolidar?normaId=${id}`);
+                    const consolidadoData = await consolidadoResp.json();
+
+                    if (consolidadoData.estado === 'derogada') {
+                        // Banner rojo de derogación
+                        const derogadoPor = consolidadoData.derogado_por;
+                        textDiv.insertAdjacentHTML('afterbegin', `
+                            <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.5); border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; display:flex; align-items:center; gap:12px;">
+                                <span style="font-size: 1.5em;">⚠️</span>
+                                <div>
+                                    <strong style="color:#f87171; font-size:0.95em; display:block;">NORMA DEROGADA</strong>
+                                    <span style="color:rgba(255,255,255,0.75); font-size:0.85em;">
+                                        Esta norma fue derogada por la <strong>${derogadoPor.tipo} N° ${derogadoPor.numero}</strong> (${derogadoPor.fecha || ''}).
+                                        El texto que ves es el original — ya no está vigente.
+                                    </span>
+                                </div>
+                            </div>
+                        `);
+
+                    } else if (consolidadoData.estado === 'consolidado' && consolidadoData.modificaciones && consolidadoData.modificaciones.some(m => m.aplicado)) {
+                        // Toggle texto original / texto vigente
+                        const modsAplicadas = consolidadoData.modificaciones.filter(m => m.aplicado);
+                        const textoOriginalHtml = data.resumen.replace(/\n/g, '<br>');
+                        const textoVigenteHtml = (consolidadoData.texto_consolidado || '').replace(/\n/g, '<br>');
+
+                        const toggleId = `toggle-consolidado-${id}`;
+                        const textoParaId = `texto-para-${id}`;
+                        const toggleBtnId = `toggle-btn-${id}`;
+
+                        // Insertar toggle justo después del resumen IA
+                        textDiv.insertAdjacentHTML('afterend', `
+                            <div style="margin-top: 12px;">
+                                <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px; padding: 10px 14px; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:8px;">
+                                    <span style="font-size:1.1em;">📋</span>
+                                    <span style="color:rgba(255,255,255,0.8); font-size:0.85em; flex:1;">
+                                        Esta norma tiene <strong style="color:#60a5fa;">${modsAplicadas.length} modificación(es) confirmada(s)</strong> aplicadas.
+                                    </span>
+                                    <button id="${toggleBtnId}" onclick="toggleTextoConsolidado('${id}')" 
+                                        style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:5px 12px; font-size:0.8em; cursor:pointer; white-space:nowrap;">
+                                        📋 Ver texto vigente
+                                    </button>
+                                </div>
+                                <div id="${textoParaId}" style="display:none; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding: 14px; font-size:0.88em; line-height:1.6; color:rgba(255,255,255,0.85); max-height:300px; overflow-y:auto;">
+                                    ${textoVigenteHtml}
+                                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.15); font-size:0.8em; color:rgba(255,255,255,0.5);">
+                                        ${modsAplicadas.map(m => `Modificado por: ${m.norma_origen.tipo} N° ${m.norma_origen.numero} — ${m.articulo}`).join('<br>')}
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                        // Guardar textos en data attributes para el toggle
+                        document.getElementById(textoParaId).dataset.textoOriginal = textoOriginalHtml;
+                        document.getElementById(textoParaId).dataset.textoVigente = textoVigenteHtml;
+                    }
+                } catch (e) {
+                    // No bloquear el resumen IA si falla el consolidado
+                    console.warn('consolidar fetch fallido:', e);
+                }
             } catch (err) {
                 console.error(err);
                 textDiv.innerHTML = `<span style="color: #ef4444;">⚠️ Error: ${err.message}</span>`;
             }
+        };
+
+        // Toggle función global para el texto consolidado
+        window.toggleTextoConsolidado = function(id) {
+            const textoDiv = document.getElementById(`texto-para-${id}`);
+            const btn = document.getElementById(`toggle-btn-${id}`);
+            if (!textoDiv || !btn) return;
+            const isVisible = textoDiv.style.display !== 'none';
+            textoDiv.style.display = isVisible ? 'none' : 'block';
+            btn.textContent = isVisible ? '📋 Ver texto vigente' : '📄 Ver texto original';
+            btn.style.background = isVisible ? '#3b82f6' : '#6b7280';
         };
 
         // Listeners y debounce de busqueda
