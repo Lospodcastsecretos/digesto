@@ -250,6 +250,53 @@ export default async function handler(req, res) {
       return;
     }
 
+    // 5. REVISOR DE RELACIONES
+    if (action === 'relaciones-pendientes') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      const limit = parseInt(req.query.limit) || 15;
+      const rows = await query(`
+        SELECT
+          r.id,
+          r.tipo_relacion,
+          r.articulo_afectado,
+          r.confianza,
+          r.fragmento_original,
+          r.justificacion,
+          o.numero as origen_numero,
+          o.anio as origen_anio,
+          o.tipo_nombre as origen_tipo,
+          COALESCE(d.numero, r.destino_numero_texto) as destino_numero,
+          d.anio as destino_anio,
+          COALESCE(d.tipo_nombre, r.destino_tipo_texto) as destino_tipo
+        FROM normas_relaciones r
+        JOIN normas o ON r.norma_origen_id = o.id
+        LEFT JOIN normas d ON r.norma_destino_id = d.id
+        WHERE r.revisado_humano = 0 OR r.revisado_humano IS NULL
+        ORDER BY r.confianza DESC
+        LIMIT ?
+      `, [limit]);
+      res.status(200).json(rows);
+      return;
+    }
+
+    if (action === 'relaciones-confirmar') {
+      if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+      const { id } = body || {};
+      if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
+      await query("UPDATE normas_relaciones SET revisado_humano = 1 WHERE id = ?", [id]);
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    if (action === 'relaciones-rechazar') {
+      if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+      const { id } = body || {};
+      if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
+      await query("UPDATE normas_relaciones SET revisado_humano = -1 WHERE id = ?", [id]);
+      res.status(200).json({ success: true });
+      return;
+    }
+
     res.status(400).json({ error: "Acción no reconocida." });
 
   } catch (err) {

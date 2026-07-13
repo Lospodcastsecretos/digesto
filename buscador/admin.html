@@ -88,11 +88,11 @@
       </div>
     </header>
 
-    <!-- Tabs Navigation -->
     <div class="flex space-x-6 border-b border-gray-700 mb-6">
       <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab(event, 'tab-dashboard')">📊 Dashboard</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-cache')">🧠 Control de Caché</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-simulador')">🧪 Modo Pruebas</button>
+      <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-revisor')">⚖️ Revisor</button>
     </div>
 
     <!-- Estado de Carga -->
@@ -244,6 +244,19 @@
       </div>
     </div>
 
+    <!-- TAB: Revisor -->
+    <div id="tab-revisor" class="tab-content">
+      <div class="glass-card p-6 shadow-lg mb-8">
+        <div class="mb-4">
+          <h3 class="text-xl font-semibold text-gray-200">⚖️ Revisor de Correspondencias</h3>
+          <p class="text-xs text-gray-400 mt-1">Confirma o rechaza las relaciones detectadas por la IA antes de consolidarlas.</p>
+        </div>
+        <div id="revisor-container" class="space-y-4">
+          <!-- Renderizado dinámico -->
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -336,6 +349,7 @@
       
       e.currentTarget.classList.add('active');
       document.getElementById(tabId).classList.add('active');
+      if (tabId === 'tab-revisor') fetchRelacionesPendientes();
     }
 
     async function fetchStats() {
@@ -541,6 +555,83 @@
         }
       } catch (err) {
         alert("Error de red");
+      }
+    }
+
+    // --- Lógica del Revisor de Correspondencias ---
+    async function fetchRelacionesPendientes() {
+      const container = document.getElementById('revisor-container');
+      container.innerHTML = '<p class="text-gray-400">Cargando relaciones...</p>';
+
+      try {
+        const res = await fetch('/api/admin?action=relaciones-pendientes', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (!res.ok) {
+          container.innerHTML = '<p class="text-red-400">Error al cargar relaciones.</p>';
+          return;
+        }
+        const rows = await res.json();
+        if (rows.length === 0) {
+          container.innerHTML = '<p class="text-green-400 font-semibold">¡Todo al día! No hay relaciones pendientes de revisión.</p>';
+          return;
+        }
+
+        container.innerHTML = rows.map(r => `
+          <div class="revisor-card bg-gray-800 p-4 rounded border border-gray-700 shadow flex flex-col gap-3 transition-opacity duration-300" data-id="${r.id}">
+            <div class="flex justify-between items-start">
+              <div class="text-sm">
+                <span class="font-bold text-blue-400">${r.origen_tipo} N° ${r.origen_numero}</span> <span class="text-gray-500">(${r.origen_anio})</span>
+                <span class="mx-2 text-gray-400">➡️ <span class="font-bold uppercase text-white">${r.tipo_relacion}</span> ➡️</span>
+                <span class="font-bold text-yellow-400 cursor-pointer hover:underline" onclick="window.open('/documento.html?id=${r.destino_numero}&tipo=${r.destino_tipo}', '_blank')">${r.destino_tipo} N° ${r.destino_numero}</span>
+                ${r.destino_anio ? `<span class="text-gray-500">(${r.destino_anio})</span>` : ''}
+                ${r.articulo_afectado ? `<code class="bg-gray-900 px-1 py-0.5 rounded text-xs ml-1 text-pink-300">${r.articulo_afectado}</code>` : ''}
+              </div>
+              <div class="text-xs font-mono px-2 py-1 rounded ${r.confianza > 0.8 ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
+                ${Math.round(r.confianza * 100)}% conf
+              </div>
+            </div>
+            
+            <div class="bg-gray-900 p-3 rounded text-sm text-gray-300 border-l-2 border-blue-500 italic">
+              " ${r.fragmento_original || 'Sin fragmento original'} "
+            </div>
+            
+            <div class="text-sm text-gray-400">
+              <span class="font-semibold text-gray-300">Texto propuesto:</span> ${r.justificacion || '-'}
+            </div>
+
+            <div class="flex gap-2 mt-2">
+              <button onclick="resolverRelacion(${r.id}, 'confirmar')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">✅ Confirmar</button>
+              <button onclick="resolverRelacion(${r.id}, 'rechazar')" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">❌ Rechazar</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<p class="text-red-400">Error de conexión al cargar relaciones.</p>';
+      }
+    }
+
+    async function resolverRelacion(id, accion) {
+      const card = document.querySelector(\`.revisor-card[data-id="\${id}"]\`);
+      if (card) card.style.opacity = '0.4';
+
+      try {
+        const res = await fetch(\`/api/admin?action=relaciones-\${accion}\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': \`Bearer \${currentToken}\` },
+          body: JSON.stringify({ id })
+        });
+
+        if (res.ok) {
+          if (card) card.remove();
+          if (document.querySelectorAll('.revisor-card').length === 0) fetchRelacionesPendientes();
+        } else {
+          if (card) card.style.opacity = '1';
+          alert('No se pudo actualizar la relación. Intentá de nuevo.');
+        }
+      } catch (err) {
+        if (card) card.style.opacity = '1';
+        alert('Error de red al actualizar la relación.');
       }
     }
 
