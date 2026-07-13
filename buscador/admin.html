@@ -266,17 +266,15 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-gray-400 border-b border-gray-700">
-                <th class="pb-3 pr-4">Norma Origen</th>
-                <th class="pb-3 pr-4">Tipo</th>
-                <th class="pb-3 pr-4">Norma Destino</th>
-                <th class="pb-3 pr-4">Artículo</th>
-                <th class="pb-3 pr-4">Justificación / Extracto</th>
-                <th class="pb-3 pr-4">Confianza</th>
+                <th class="pb-3 pr-4">Norma Origen (Analizada)</th>
+                <th class="pb-3 pr-4">Relación</th>
+                <th class="pb-3 pr-4">Norma Afectada / Destino</th>
+                <th class="pb-3 pr-4">Justificación (Extracto del PDF)</th>
                 <th class="pb-3">Acciones</th>
               </tr>
             </thead>
             <tbody id="rel-table-body" class="text-sm">
-              <tr><td colspan="7" class="py-8 text-center text-gray-500">Cargando...</td></tr>
+              <tr><td colspan="5" class="py-8 text-center text-gray-500">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -781,21 +779,19 @@
                 <span class="font-bold uppercase text-xs ${tipoColor}">${rel.tipo_relacion}</span>
               </td>
               <td class="py-3 pr-4">
-                <div class="text-gray-200">${destNorma}</div>
-                <div class="text-xs text-gray-500">${rel.destino_fecha || ''}</div>
+                <div class="text-gray-200 font-semibold">${destNorma}</div>
+                ${rel.articulo_afectado ? `<div class="text-xs text-blue-400 font-medium" style="margin-top:2px;">Afecta: ${rel.articulo_afectado}</div>` : '<div class="text-xs text-gray-500" style="margin-top:2px;">Afectación Total</div>'}
               </td>
-              <td class="py-3 pr-4 text-gray-300 text-xs">${rel.articulo_afectado || '<em class="text-gray-500">Total</em>'}</td>
-              <td class="py-3 pr-4 text-gray-400 text-xs italic" style="max-width: 320px; white-space: normal; word-break: break-word; line-height: 1.4;">
+              <td class="py-3 pr-4 text-gray-300 text-xs italic" style="max-width: 400px; white-space: normal; word-break: break-word; line-height: 1.4;">
                 ${rel.justificacion ? `"${rel.justificacion}"` : '<span class="text-gray-600">-</span>'}
               </td>
-              <td class="py-3 pr-4 font-bold ${confianzaColor}">${parseFloat(rel.confianza).toFixed(2)}</td>
               <td class="py-3">${acciones}</td>
             </tr>
           `;
         }).join('');
 
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">❌ Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">❌ Error: ${err.message}</td></tr>`;
       }
     }
 
