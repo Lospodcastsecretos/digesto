@@ -612,13 +612,13 @@
     }
 
     async function resolverRelacion(id, accion) {
-      const card = document.querySelector(\`.revisor-card[data-id="\${id}"]\`);
+      const card = document.querySelector(`.revisor-card[data-id="${id}"]`);
       if (card) card.style.opacity = '0.4';
 
       try {
-        const res = await fetch(\`/api/admin?action=relaciones-\${accion}\`, {
+        const res = await fetch(`/api/admin?action=relaciones-${accion}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': \`Bearer \${currentToken}\` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
           body: JSON.stringify({ id })
         });
 
