@@ -594,19 +594,9 @@
             return `<span class="font-bold text-gray-500" title="Sin archivo físico">${label}</span>`;
           }
           
-          if (files.length === 1) {
-            const url = `https://raw.githubusercontent.com/Lospodcastsecretos/digesto-documentos/main/${files[0]}`;
-            return `<a href="${url}" target="_blank" class="font-bold ${colorClass} hover:underline" title="Ver archivo: ${files[0]}">${label}</a>`;
-          }
-          
-          const linksHtml = files.map((file, idx) => {
-            const url = `https://raw.githubusercontent.com/Lospodcastsecretos/digesto-documentos/main/${file}`;
-            const ext = file.split('.').pop().toLowerCase();
-            const icon = ext === 'pdf' ? '📄' : '📝';
-            return `<a href="${url}" target="_blank" class="text-[10px] bg-gray-700 hover:bg-gray-600 px-1.5 py-0.5 rounded text-gray-300 transition hover:text-white inline-flex items-center gap-0.5" title="Ver ${file}">${icon} Pág ${idx + 1}</a>`;
-          }).join(' ');
-          
-          return `<span class="font-bold text-white mr-1">${label}</span> <div class="inline-flex gap-1 flex-wrap align-middle">${linksHtml}</div>`;
+          // Abrir siempre el primer archivo
+          const url = `https://raw.githubusercontent.com/Lospodcastsecretos/digesto-documentos/main/${files[0]}`;
+          return `<a href="${url}" target="_blank" class="font-bold ${colorClass} hover:underline" title="Ver archivo: ${files[0]}">${label}</a>`;
         };
 
         container.innerHTML = rows.map(r => `
