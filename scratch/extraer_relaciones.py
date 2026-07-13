@@ -155,8 +155,8 @@ def llamar_llm(prompt_text, max_retries=2):
                     content = resp.json()["choices"][0]["message"]["content"]
                     return content, "groq"
                 elif resp.status_code == 429:
-                    print(f"   ⚠️ Groq rate limit (429). Esperando 15s...")
-                    time.sleep(15)
+                    print(f"   ⚠️ Groq rate limit (429). Esperando 30s...")
+                    time.sleep(30)
                     continue
                 else:
                     print(f"   ⚠️ Groq HTTP {resp.status_code}")
@@ -353,7 +353,7 @@ def main():
                 time.sleep(1.2)
                 continue
 
-            # ── Deduplicar por (dest_tipo, dest_numero, articulo) ──────────────
+            # ── Deduplicar y filtrar auto-referencias ─────────────────────────
             vistas = set()
             relaciones_unicas = []
             for rel in relaciones:
@@ -363,6 +363,12 @@ def main():
                 dest_tipo = rel.get("norma_destino_tipo", "Ordenanza")
                 dest_num = str(rel.get("norma_destino_numero", "")).strip()
                 art = str(rel.get("articulo_afectado") or "").strip()
+
+                # Descartar si la norma se apunta a sí misma (hallucination del encabezado)
+                if dest_num == str(norma["numero"]) and dest_tipo == norma["tipo_nombre"]:
+                    print(f"   ⚠️ Auto-referencia descartada: {dest_tipo} N° {dest_num}")
+                    continue
+
                 clave = (dest_tipo, dest_num, art)
                 if clave not in vistas:
                     vistas.add(clave)
