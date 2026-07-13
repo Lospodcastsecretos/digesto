@@ -257,11 +257,14 @@ export default async function handler(req, res) {
       const rows = await query(`
         SELECT
           r.id,
+          r.norma_origen_id,
           r.tipo_relacion,
           r.articulo_afectado,
           r.confianza,
           r.fragmento_original,
           r.justificacion,
+          r.destino_numero_texto,
+          r.destino_tipo_texto,
           o.numero as origen_numero,
           o.fecha as origen_fecha,
           o.tipo_nombre as origen_tipo,
@@ -283,10 +286,35 @@ export default async function handler(req, res) {
 
     if (action === 'relaciones-confirmar') {
       if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
-      const { id } = body || {};
+      const { id, tipo_relacion, articulo_afectado, destino_numero_texto, destino_tipo_texto } = body || {};
       if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
-      await query("UPDATE normas_relaciones SET revisado_humano = 1 WHERE id = ?", [id]);
-      res.status(200).json({ success: true });
+      
+      // Intentar re-resolver la norma destino si es que fue editada
+      let dest_id = null;
+      if (destino_numero_texto && destino_tipo_texto) {
+        const resolvedDest = await query(
+          "SELECT id FROM normas WHERE numero = ? AND tipo_nombre = ? LIMIT 1",
+          [destino_numero_texto.toString().trim(), destino_tipo_texto.toString().trim()]
+        );
+        if (resolvedDest && resolvedDest.length > 0) {
+          dest_id = resolvedDest[0].id;
+        }
+      }
+
+      await query(
+        `UPDATE normas_relaciones 
+         SET tipo_relacion = ?, articulo_afectado = ?, destino_numero_texto = ?, destino_tipo_texto = ?, norma_destino_id = ?, revisado_humano = 1
+         WHERE id = ?`,
+        [
+          tipo_relacion || '',
+          articulo_afectado === undefined ? null : articulo_afectado,
+          destino_numero_texto || '',
+          destino_tipo_texto || '',
+          dest_id,
+          id
+        ]
+      );
+      res.status(200).json({ success: true, resolvedDestId: dest_id });
       return;
     }
 
@@ -296,6 +324,15 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
       await query("UPDATE normas_relaciones SET revisado_humano = -1 WHERE id = ?", [id]);
       res.status(200).json({ success: true });
+      return;
+    }
+
+    if (action === 'norma-texto') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
+      const rows = await query("SELECT texto_completo FROM normas WHERE id = ?", [parseInt(id)]);
+      res.status(200).json({ texto: rows[0]?.texto_completo || 'No se encontró el texto completo de esta norma.' });
       return;
     }
 

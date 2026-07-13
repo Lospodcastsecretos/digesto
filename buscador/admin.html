@@ -622,9 +622,47 @@
               <span class="font-semibold text-gray-300">Texto propuesto:</span> ${r.justificacion || '-'}
             </div>
 
-            <div class="flex gap-2 mt-2">
-              <button onclick="resolverRelacion(${r.id}, 'confirmar')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">✅ Confirmar</button>
-              <button onclick="resolverRelacion(${r.id}, 'rechazar')" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">❌ Rechazar</button>
+            <!-- Editor de datos -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-900/60 p-3 rounded border border-gray-700 text-xs mt-1">
+              <div>
+                <label class="block text-gray-400 font-semibold mb-1">Relación</label>
+                <select id="edit-relacion-${r.id}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 text-white text-xs">
+                  <option value="modifica" ${r.tipo_relacion === 'modifica' ? 'selected' : ''}>Modifica</option>
+                  <option value="deroga" ${r.tipo_relacion === 'deroga' ? 'selected' : ''}>Deroga</option>
+                  <option value="complementa" ${r.tipo_relacion === 'complementa' ? 'selected' : ''}>Complementa</option>
+                  <option value="reglamenta" ${r.tipo_relacion === 'reglamenta' ? 'selected' : ''}>Reglamenta</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-gray-400 font-semibold mb-1">Artículo Afectado</label>
+                <input type="text" id="edit-articulo-${r.id}" value="${r.articulo_afectado || ''}" placeholder="Ej. Art. 4" class="w-full bg-gray-800 border border-gray-700 rounded p-1 text-white text-xs">
+              </div>
+              <div>
+                <label class="block text-gray-400 font-semibold mb-1">Destino (Tipo)</label>
+                <select id="edit-dest-tipo-${r.id}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 text-white text-xs">
+                  <option value="Ordenanza" ${r.destino_tipo === 'Ordenanza' ? 'selected' : ''}>Ordenanza</option>
+                  <option value="Decreto" ${r.destino_tipo === 'Decreto' ? 'selected' : ''}>Decreto</option>
+                  <option value="Resolución" ${r.destino_tipo === 'Resolución' ? 'selected' : ''}>Resolución</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-gray-400 font-semibold mb-1">Destino (N°)</label>
+                <input type="text" id="edit-dest-numero-${r.id}" value="${r.destino_numero || ''}" placeholder="Solo número" class="w-full bg-gray-800 border border-gray-700 rounded p-1 text-white text-xs">
+              </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-2 flex-wrap gap-2">
+              <div class="flex gap-2">
+                <button onclick="resolverRelacion(${r.id}, 'confirmar')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">✅ Confirmar</button>
+                <button onclick="resolverRelacion(${r.id}, 'rechazar')" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition">❌ Rechazar</button>
+              </div>
+              <button onclick="toggleTextoCompleto(${r.id}, ${r.norma_origen_id})" class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1.5 rounded text-xs transition flex items-center gap-1 font-semibold">
+                🔍 Ver Texto Completo
+              </button>
+            </div>
+
+            <div id="fulltext-container-${r.id}" class="hidden mt-3 bg-gray-900 border border-gray-700 rounded p-3 text-xs max-h-60 overflow-y-auto font-mono whitespace-pre-wrap text-gray-300">
+              <!-- Texto completo cargado dinámicamente -->
             </div>
           </div>
         `).join('');
@@ -633,15 +671,56 @@
       }
     }
 
+    async function toggleTextoCompleto(relacionId, origenNormaId) {
+      const container = document.getElementById(`fulltext-container-${relacionId}`);
+      if (!container) return;
+      
+      container.classList.toggle('hidden');
+      if (container.classList.contains('hidden')) return;
+      
+      if (container.innerHTML && container.innerHTML !== 'Cargando texto completo...') return;
+      
+      container.innerHTML = 'Cargando texto completo...';
+      try {
+        const res = await fetch(`/api/admin?action=norma-texto&id=${origenNormaId}`, {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          container.textContent = data.texto || 'Esta norma no contiene texto completo.';
+        } else {
+          container.innerHTML = '<span class="text-red-400">Error al cargar el texto de la norma.</span>';
+        }
+      } catch (err) {
+        container.innerHTML = '<span class="text-red-400">Error de conexión.</span>';
+      }
+    }
+
     async function resolverRelacion(id, accion) {
       const card = document.querySelector(`.revisor-card[data-id="${id}"]`);
       if (card) card.style.opacity = '0.4';
+
+      let bodyData = { id };
+      if (accion === 'confirmar') {
+        const relacion = document.getElementById(`edit-relacion-${id}`).value;
+        const articulo = document.getElementById(`edit-articulo-${id}`).value.trim() || null;
+        const destTipo = document.getElementById(`edit-dest-tipo-${id}`).value;
+        const destNumero = document.getElementById(`edit-dest-numero-${id}`).value.trim();
+        
+        bodyData = {
+          id,
+          tipo_relacion: relacion,
+          articulo_afectado: articulo,
+          destino_tipo_texto: destTipo,
+          destino_numero_texto: destNumero
+        };
+      }
 
       try {
         const res = await fetch(`/api/admin?action=relaciones-${accion}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
-          body: JSON.stringify({ id })
+          body: JSON.stringify(bodyData)
         });
 
         if (res.ok) {
