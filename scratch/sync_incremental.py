@@ -400,17 +400,37 @@ def main():
         print(f"❌ Error al consultar la API del Digesto: {e}")
         sys.exit(1)
 
-    print("2️⃣ Buscando IDs de normas ya existentes en Turso...")
+    print("2️⃣ Buscando normas ya existentes en Turso...")
     try:
-        existentes_rows = turso_query("SELECT id FROM normas")
+        existentes_rows = turso_query("SELECT id, numero, tipo_nombre FROM normas")
         existentes_ids = {int(row["id"]) for row in existentes_rows if row.get("id") is not None}
+        existentes_claves = {
+            (str(row.get("numero")).strip(), str(row.get("tipo_nombre")).strip())
+            for row in existentes_rows 
+            if row.get("numero") and row.get("tipo_nombre")
+        }
         print(f"   -> Encontradas {len(existentes_ids)} normas indexadas en la base de datos.")
     except Exception as e:
         print(f"❌ Error al consultar normas existentes en Turso: {e}")
         sys.exit(1)
 
-    # Identificar las normas que faltan
-    nuevas_publicaciones = [p for p in publicaciones if p.get("id") and int(p.get("id")) not in existentes_ids]
+    # Identificar las normas que faltan (evitando colisiones con claves duplicadas limpiadas)
+    nuevas_publicaciones = []
+    for p in publicaciones:
+        if not p.get("id"):
+            continue
+        
+        # Pre-normalizar temporalmente para comparar por número y tipo
+        norma_norm = normalizar_publicacion(p)
+        num_str = str(norma_norm["numero"]).strip()
+        tipo_str = str(norma_norm["tipo_nombre"]).strip()
+        
+        id_existe = int(p.get("id")) in existentes_ids
+        clave_existe = (num_str, tipo_str) in existentes_claves
+        
+        if not id_existe and not clave_existe:
+            nuevas_publicaciones.append(p)
+            
     print(f"   -> Detectadas {len(nuevas_publicaciones)} normas nuevas por sincronizar.")
 
     if not nuevas_publicaciones:
