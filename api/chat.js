@@ -1,5 +1,6 @@
 import { registrarTelemetria } from './_lib/telemetria.js';
 import { getQueryEmbedding } from './_lib/embeddings.js';
+import { isRateLimited } from './_lib/rateLimit.js';
 
 // Variables globales del Circuit Breaker (en memoria del contenedor warm de Vercel)
 let dsFailures = 0;
@@ -60,6 +61,14 @@ export default async function handler(req, res) {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch(e) {}
   }
+
+  // Aplicar Rate Limiting (Máximo 5 consultas por minuto)
+  const isLimited = await isRateLimited(req, 'chat', 5, 60, cacheUrl, cacheAuthToken);
+  if (isLimited) {
+    res.status(429).json({ error: "Demasiadas consultas de chat. Por favor, espera un minuto." });
+    return;
+  }
+
   const { message, history, attachedNormIds, isTest } = body || {};
   if (!message) {
     res.status(400).json({ 

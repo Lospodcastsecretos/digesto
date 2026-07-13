@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isRateLimited } from './_lib/rateLimit.js';
 
 // Variables globales del Circuit Breaker (en memoria de Vercel)
 let dsFailures = 0;
@@ -15,6 +16,8 @@ export default async function handler(req, res) {
   const authToken = process.env.TURSO_TOKEN;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
+  const cacheUrl = process.env.TURSO_CACHE_URL || url;
+  const cacheAuthToken = process.env.TURSO_CACHE_TOKEN || authToken;
 
   if (!url || !authToken || (!deepseekKey && !groqKey)) {
     res.status(500).json({ error: "Faltan variables de entorno esenciales en Vercel." });
@@ -58,6 +61,14 @@ export default async function handler(req, res) {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch(e) {}
   }
+
+  // Aplicar Rate Limiting (Máximo 5 consultas de lote por minuto)
+  const isLimited = await isRateLimited(req, 'analizar-lote', 5, 60, cacheUrl, cacheAuthToken);
+  if (isLimited) {
+    res.status(429).json({ error: "Demasiadas consultas de análisis por lote. Por favor, espera un minuto." });
+    return;
+  }
+
   const { ids, query } = body || {};
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {

@@ -1,5 +1,6 @@
 import { registrarTelemetria } from './_lib/telemetria.js';
 import { getQueryEmbedding } from './_lib/embeddings.js';
+import { isRateLimited } from './_lib/rateLimit.js';
 
 // Variables globales del Circuit Breaker (en memoria de Vercel)
 let dsFailures = 0;
@@ -28,6 +29,14 @@ export default async function handler(req, res) {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch(e) {}
   }
+
+  // Aplicar Rate Limiting (Máximo 5 consultas de informe por minuto)
+  const isLimited = await isRateLimited(req, 'sintetizar-informe', 5, 60, cacheUrl, cacheAuthToken);
+  if (isLimited) {
+    res.status(429).json({ error: "Demasiadas consultas de informe. Por favor, espera un minuto." });
+    return;
+  }
+
   const { extractos, query } = body || {};
 
   if (!extractos || !Array.isArray(extractos)) {

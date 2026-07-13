@@ -1,4 +1,5 @@
 import { getQueryEmbedding } from './_lib/embeddings.js';
+import { isRateLimited } from './_lib/rateLimit.js';
 
 export default async function handler(req, res) {
   // Habilitar CORS
@@ -23,6 +24,13 @@ export default async function handler(req, res) {
 
   if (!url || !authToken) {
     res.status(500).json({ error: "Faltan las variables de entorno de conexión a Turso (TURSO_URL o TURSO_TOKEN)." });
+    return;
+  }
+
+  // Aplicar Rate Limiting (Máximo 20 búsquedas por minuto por IP para proteger OpenAI Embeddings)
+  const isLimited = await isRateLimited(req, 'buscar', 20, 60, cacheUrl, cacheAuthToken);
+  if (isLimited) {
+    res.status(429).json({ error: "Demasiadas búsquedas. Por favor, espera un minuto." });
     return;
   }
 
