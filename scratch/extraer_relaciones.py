@@ -22,6 +22,9 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 CHECKPOINT_FILE = "scratch/.checkpoint_relaciones"
 ERROR_LOG = "scratch/errores_relaciones.log"
 
+# Tipos de norma que pertenecen a la BD municipal (los demás se guardan sin ID de destino)
+TIPOS_MUNICIPALES = {"Ordenanza", "Decreto", "Resolución"}
+
 if not TURSO_URL or not TURSO_TOKEN:
     print("❌ Faltan variables de entorno TURSO_URL o TURSO_TOKEN.")
     sys.exit(1)
@@ -82,63 +85,85 @@ def turso_execute(sql, params=None):
     return result["response"]["result"]["affected_row_count"]
 
 
-# ─── Circuit breaker DeepSeek → Groq ─────────────────────────────────────────
+# ─── Circuit breaker DeepSeek → Groq con retry + backoff ─────────────────────
 ds_failures = 0
 DS_FAILURE_THRESHOLD = 3
 ds_tripped_until = 0
 
 
-def llamar_llm(prompt_text):
+def llamar_llm(prompt_text, max_retries=2):
     global ds_failures, ds_tripped_until
 
-    # Intentar DeepSeek (si no está en circuit break)
-    if DEEPSEEK_API_KEY and time.time() > ds_tripped_until:
-        try:
-            resp = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [{"role": "user", "content": prompt_text}],
-                    "max_tokens": 2000,
-                    "temperature": 0.1,
-                    "response_format": {"type": "json_object"}
-                },
-                timeout=45
-            )
-            if resp.status_code == 200:
-                ds_failures = 0
-                content = resp.json()["choices"][0]["message"]["content"]
-                return content, "deepseek"
-            else:
-                ds_failures += 1
-                if ds_failures >= DS_FAILURE_THRESHOLD:
-                    ds_tripped_until = time.time() + 120
-                    print(f"   ⚡ Circuit breaker abierto: DeepSeek pausado 120s")
-        except Exception as e:
-            ds_failures += 1
-            print(f"   ⚠️ Error DeepSeek: {e}")
+    for intento in range(max_retries + 1):
+        if intento > 0:
+            wait = 3 * intento  # backoff: 3s, 6s...
+            print(f"   🔄 Reintentando en {wait}s (intento {intento+1}/{max_retries+1})...")
+            time.sleep(wait)
 
-    # Fallback a Groq
-    if GROQ_API_KEY:
-        try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt_text}],
-                    "max_tokens": 2000,
-                    "temperature": 0.1,
-                    "response_format": {"type": "json_object"}
-                },
-                timeout=30
-            )
-            if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                return content, "groq"
-        except Exception as e:
-            print(f"   ⚠️ Error Groq: {e}")
+        # Intentar DeepSeek (si no está en circuit break)
+        if DEEPSEEK_API_KEY and time.time() > ds_tripped_until:
+            try:
+                resp = requests.post(
+                    "https://api.deepseek.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [{"role": "user", "content": prompt_text}],
+                        "max_tokens": 2000,
+                        "temperature": 0.1,
+                        "response_format": {"type": "json_object"}
+                    },
+                    timeout=60
+                )
+                if resp.status_code == 200:
+                    ds_failures = 0
+                    content = resp.json()["choices"][0]["message"]["content"]
+                    return content, "deepseek"
+                elif resp.status_code == 429:
+                    print(f"   ⚠️ DeepSeek rate limit (429). Esperando 10s...")
+                    time.sleep(10)
+                    continue
+                else:
+                    ds_failures += 1
+                    print(f"   ⚠️ DeepSeek HTTP {resp.status_code}")
+                    if ds_failures >= DS_FAILURE_THRESHOLD:
+                        ds_tripped_until = time.time() + 120
+                        print(f"   ⚡ Circuit breaker abierto: DeepSeek pausado 120s")
+            except requests.exceptions.Timeout:
+                ds_failures += 1
+                print(f"   ⚠️ DeepSeek timeout")
+            except Exception as e:
+                ds_failures += 1
+                print(f"   ⚠️ Error DeepSeek: {e}")
+
+        # Fallback a Groq
+        if GROQ_API_KEY:
+            try:
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "messages": [{"role": "user", "content": prompt_text}],
+                        "max_tokens": 2000,
+                        "temperature": 0.1,
+                        "response_format": {"type": "json_object"}
+                    },
+                    timeout=45
+                )
+                if resp.status_code == 200:
+                    content = resp.json()["choices"][0]["message"]["content"]
+                    return content, "groq"
+                elif resp.status_code == 429:
+                    print(f"   ⚠️ Groq rate limit (429). Esperando 15s...")
+                    time.sleep(15)
+                    continue
+                else:
+                    print(f"   ⚠️ Groq HTTP {resp.status_code}")
+            except requests.exceptions.Timeout:
+                print(f"   ⚠️ Groq timeout")
+            except Exception as e:
+                print(f"   ⚠️ Error Groq: {e}")
 
     return None, None
 
@@ -158,21 +183,25 @@ Responde ÚNICAMENTE con un objeto JSON con una clave "relaciones" que contenga 
   "norma_destino_tipo": "Ordenanza" | "Decreto" | "Resolución",
   "norma_destino_numero": "string, solo el número",
   "articulo_afectado": "string o null si es derogación/afectación total",
-  "texto_nuevo": null,
   "confianza": número entre 0.0 y 1.0
 }}
 
 Si el texto NO modifica ninguna otra norma, responde exactamente: {{"relaciones": []}}
 
 Reglas estrictas:
+- Solo incluir normas de tipo Ordenanza, Decreto o Resolución (municipales). Ignorar Leyes provinciales/nacionales.
 - No inventes números de norma que no estén explícitamente citados en el texto.
 - Una simple mención o referencia ("de acuerdo a la Ordenanza X") NO es una modificación.
 - Solo incluir relaciones donde el texto explícitamente dice "Modifícase", "Derógase", "Sustitúyese", "Incorpórase", "Reemplázase" o equivalente.
-- Si tenés dudas, bajá el valor de "confianza" en lugar de omitir la relación.
-- texto_nuevo siempre null (no capturamos texto de reemplazo en esta fase)."""
+- Si una norma modifica varios artículos de otra, listarlos como entradas SEPARADAS (una por artículo).
+- IMPORTANTE: No repetir la misma combinación (norma_destino_numero + articulo_afectado) más de una vez.
+- Si tenés dudas, bajá el valor de "confianza" en lugar de omitir la relación."""
 
 
 def buscar_norma_destino(numero, tipo):
+    # Solo buscar en la BD si es tipo municipal
+    if tipo not in TIPOS_MUNICIPALES:
+        return None
     try:
         rows = turso_query(
             "SELECT id FROM normas WHERE numero = ? AND tipo_nombre = ? LIMIT 1",
@@ -283,7 +312,7 @@ def main():
         print(f"\n[{idx}/{total}] {norma['tipo_nombre']} N° {norma['numero']} (id={norma_id})...")
 
         try:
-            # Necesitamos el texto completo (no lo traemos antes para no saturar memoria)
+            # Traer el texto completo de esta norma
             texto_rows = turso_query(
                 "SELECT texto_completo FROM normas WHERE id = ?", [norma_id]
             )
@@ -295,19 +324,18 @@ def main():
             norma["texto_completo"] = texto_rows[0]["texto_completo"]
             prompt = construir_prompt(norma)
 
-            # Llamar al LLM
+            # Llamar al LLM (con retry+backoff integrado)
             content, modelo_usado = llamar_llm(prompt)
             if not content:
-                log_error(norma_id, norma["numero"], "LLM no respondió")
+                log_error(norma_id, norma["numero"], "LLM no respondió tras reintentos")
                 error_count += 1
                 guardar_checkpoint(norma_id)
-                time.sleep(0.5)
+                time.sleep(1.2)
                 continue
 
             # Parsear JSON
             try:
                 parsed = json.loads(content)
-                # Manejar tanto {"relaciones": [...]} como directamente [...]
                 relaciones = parsed.get("relaciones", parsed) if isinstance(parsed, dict) else parsed
                 if not isinstance(relaciones, list):
                     relaciones = []
@@ -315,30 +343,42 @@ def main():
                 log_error(norma_id, norma["numero"], f"JSON inválido: {je} | content: {content[:200]}")
                 error_count += 1
                 guardar_checkpoint(norma_id)
-                time.sleep(0.5)
+                time.sleep(1.2)
                 continue
 
             if not relaciones:
                 print(f"   -> Sin relaciones detectadas ({modelo_usado})")
                 ok_count += 1
                 guardar_checkpoint(norma_id)
-                time.sleep(0.5)
+                time.sleep(1.2)
                 continue
 
-            print(f"   -> {len(relaciones)} relación(es) detectada(s) ({modelo_usado})")
-
+            # ── Deduplicar por (dest_tipo, dest_numero, articulo) ──────────────
+            vistas = set()
+            relaciones_unicas = []
             for rel in relaciones:
-                tipo = rel.get("tipo_relacion", "").lower()
-                if tipo not in ("modifica", "deroga", "complementa", "reglamenta"):
+                tipo_rel = rel.get("tipo_relacion", "").lower()
+                if tipo_rel not in ("modifica", "deroga", "complementa", "reglamenta"):
                     continue
+                dest_tipo = rel.get("norma_destino_tipo", "Ordenanza")
+                dest_num = str(rel.get("norma_destino_numero", "")).strip()
+                art = str(rel.get("articulo_afectado") or "").strip()
+                clave = (dest_tipo, dest_num, art)
+                if clave not in vistas:
+                    vistas.add(clave)
+                    relaciones_unicas.append(rel)
 
+            print(f"   -> {len(relaciones_unicas)} relación(es) única(s) detectada(s) ({modelo_usado})")
+
+            for rel in relaciones_unicas:
+                tipo = rel.get("tipo_relacion", "").lower()
                 dest_tipo = rel.get("norma_destino_tipo", "Ordenanza")
                 dest_numero = str(rel.get("norma_destino_numero", "")).strip()
-                articulo = rel.get("articulo_afectado")
+                articulo = rel.get("articulo_afectado") or None
                 confianza = float(rel.get("confianza", 0.5))
-                confianza = max(0.0, min(1.0, confianza))  # clamp 0–1
+                confianza = max(0.0, min(1.0, confianza))
 
-                # Intentar resolver ID de destino
+                # Intentar resolver ID solo si es tipo municipal
                 dest_id = buscar_norma_destino(dest_numero, dest_tipo)
 
                 print(f"      [{tipo.upper()}] → {dest_tipo} N° {dest_numero} | art={articulo} | conf={confianza:.2f} | id_destino={dest_id or 'NULL'}")
@@ -361,7 +401,7 @@ def main():
             error_count += 1
 
         guardar_checkpoint(norma_id)
-        time.sleep(0.5)  # Rate limiting propio
+        time.sleep(1.2)  # Rate limiting: 1.2s entre normas
 
     print(f"\n{'─'*50}")
     print(f"✅ EXTRACCIÓN COMPLETADA")
