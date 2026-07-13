@@ -25,7 +25,7 @@ TURSO_TOKEN = os.environ.get("TURSO_TOKEN")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 SITE_URL = "https://digestoaltagracia.com.ar"
-API_KEY = os.environ.get("SITE_API_KEY")
+API_KEY = "$2y$10$VXghLWoHpSnWbrhXk.p0y.BRuUHI3RZ7pAT1QC4F8T3.7693PWVCy"
 
 digesto_headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
