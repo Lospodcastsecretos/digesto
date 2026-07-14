@@ -87,8 +87,12 @@ export default async function handler(req, res) {
                   {
                     type: "execute",
                     stmt: {
-                      sql: "SELECT id FROM normas_fts WHERE normas_fts MATCH ? LIMIT 200",
-                      args: [{ type: "text", value: ftsCandidatesQuery }]
+                      sql: "SELECT id FROM normas_fts WHERE normas_fts MATCH ? UNION SELECT id FROM normas WHERE numero = ? OR numero LIKE ? LIMIT 200",
+                      args: [
+                        { type: "text", value: ftsCandidatesQuery },
+                        { type: "text", value: query.trim() },
+                        { type: "text", value: `%${query.trim()}%` }
+                      ]
                     }
                   },
                   { type: "close" }
@@ -141,16 +145,19 @@ export default async function handler(req, res) {
       sql = `
         SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
                (1.0 - vector_distance_cos(embedding, ?)) AS vector_score,
-               (CASE WHEN id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) THEN 1.0 ELSE 0.0 END) AS fts_score
+               (CASE WHEN id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) THEN 1.0 ELSE 0.0 END) AS fts_score,
+               (CASE WHEN numero = ? THEN 100.0 WHEN numero LIKE ? THEN 50.0 ELSE 0.0 END) AS exact_num_score
         FROM normas
         WHERE id IN (${idPlaceholders}) ${filterSql}
-        ORDER BY (fts_score * 0.6 + vector_score * 0.4) DESC
+        ORDER BY (exact_num_score + fts_score * 0.6 + vector_score * 0.4) DESC
         LIMIT ? OFFSET ?
       `;
       
       params.push(
         queryVectorBlob, 
         parseFtsQuery(query),
+        query.trim(),
+        `%${query.trim()}%`,
         ...candidateIds, 
         ...filterParams, 
         itemsPerPage, 
@@ -164,16 +171,22 @@ export default async function handler(req, res) {
       // FALLBACK: Búsqueda sintáctica FTS5 tradicional
       sql = `
         SELECT id, numero, titulo, resumen, tipo_nombre, categoria_nombre, vigente, fecha, archivo_pdf, url_detalle,
-               0.0 AS vector_score, 1.0 AS fts_score
+               0.0 AS vector_score, 1.0 AS fts_score,
+               (CASE WHEN numero = ? THEN 100.0 WHEN numero LIKE ? THEN 50.0 ELSE 0.0 END) AS exact_num_score
         FROM normas
-        WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) ${filterSql}
-        ORDER BY id DESC
+        WHERE (id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) OR numero = ? OR numero LIKE ?) ${filterSql}
+        ORDER BY exact_num_score DESC, id DESC
         LIMIT ? OFFSET ?
       `;
-      params.push(parseFtsQuery(query), ...filterParams, itemsPerPage, offset);
+      params.push(
+        query.trim(), `%${query.trim()}%`,
+        parseFtsQuery(query), 
+        query.trim(), `%${query.trim()}%`,
+        ...filterParams, itemsPerPage, offset
+      );
 
-      countSql = `SELECT COUNT(*) as total FROM normas WHERE id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) ${filterSql}`;
-      countParams.push(parseFtsQuery(query), ...filterParams);
+      countSql = `SELECT COUNT(*) as total FROM normas WHERE (id IN (SELECT id FROM normas_fts WHERE normas_fts MATCH ?) OR numero = ? OR numero LIKE ?) ${filterSql}`;
+      countParams.push(parseFtsQuery(query), query.trim(), `%${query.trim()}%`, ...filterParams);
     } else {
       // SIN CONSULTA: Listar de forma tradicional
       sql = `
