@@ -277,13 +277,23 @@ export default async function handler(req, res) {
 
       // Calcular porcentaje de relevancia
       let relevancia = null;
-      if (queryVectorBlob) {
+      if (queryVectorBlob || query) {
         const vScore = parseFloat(item.vector_score) || 0;
         const fScore = parseFloat(item.fts_score) || 0;
-        // Ajustamos la relevancia para que se vea amigable en la interfaz (escala 0-100)
-        // La similitud de coseno en text-embedding-3-small suele rondar entre 0.1 y 0.7 para textos legales
-        const normalizedVector = Math.min(Math.max((vScore - 0.15) / 0.55, 0), 1);
-        relevancia = Math.round((fScore * 0.5 + normalizedVector * 0.5) * 100);
+        const exactScore = parseFloat(item.exact_num_score) || 0;
+        
+        if (exactScore === 100.0) {
+            relevancia = 100;
+        } else {
+            // Ajustamos la relevancia para que se vea amigable en la interfaz (escala 0-100)
+            const normalizedVector = Math.min(Math.max((vScore - 0.15) / 0.55, 0), 1);
+            relevancia = Math.round((fScore * 0.5 + normalizedVector * 0.5) * 100);
+            
+            // Si hay un match parcial numérico, darle un pequeño boost adicional
+            if (exactScore === 50.0 && relevancia < 90) {
+                relevancia += 10;
+            }
+        }
       }
 
       return {
