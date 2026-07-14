@@ -1058,7 +1058,7 @@
     const originalSwitchTab = switchTab;
     switchTab = function(e, tabId) {
       originalSwitchTab(e, tabId);
-      if (tabId === 'tab-explorador' && !document.getElementById('exp-categoria').options.length > 1) {
+      if (tabId === 'tab-explorador' && document.getElementById('exp-categoria').options.length <= 1) {
         initExplorador();
       }
       if (tabId !== 'tab-explorador') {
