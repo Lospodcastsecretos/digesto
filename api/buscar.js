@@ -87,11 +87,17 @@ export default async function handler(req, res) {
                   {
                     type: "execute",
                     stmt: {
-                      sql: "SELECT id FROM normas_fts WHERE normas_fts MATCH ? UNION SELECT id FROM normas WHERE numero = ? OR numero LIKE ? LIMIT 200",
+                      sql: `SELECT id FROM (
+                              SELECT id, 10 AS p FROM normas WHERE numero = ? 
+                              UNION ALL
+                              SELECT id, 5 AS p FROM normas WHERE numero LIKE ? 
+                              UNION ALL
+                              SELECT id, 1 AS p FROM normas_fts WHERE normas_fts MATCH ?
+                            ) GROUP BY id ORDER BY MAX(p) DESC LIMIT 200`,
                       args: [
-                        { type: "text", value: ftsCandidatesQuery },
                         { type: "text", value: query.trim() },
-                        { type: "text", value: `%${query.trim()}%` }
+                        { type: "text", value: `%${query.trim()}%` },
+                        { type: "text", value: ftsCandidatesQuery }
                       ]
                     }
                   },
