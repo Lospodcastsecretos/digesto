@@ -88,11 +88,12 @@
       </div>
     </header>
 
-    <div class="flex space-x-6 border-b border-gray-700 mb-6">
+    <div class="flex space-x-6 border-b border-gray-700 mb-6 overflow-x-auto whitespace-nowrap">
       <button class="tab-btn active pb-2 font-semibold transition" onclick="switchTab(event, 'tab-dashboard')">📊 Dashboard</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-cache')">🧠 Control de Caché</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-simulador')">🧪 Modo Pruebas</button>
       <button class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-revisor')">⚖️ Revisor</button>
+      <button id="btn-tab-explorador" class="tab-btn pb-2 font-semibold transition" onclick="switchTab(event, 'tab-explorador')">🔍 Explorador</button>
     </div>
 
     <!-- Estado de Carga -->
@@ -253,6 +254,54 @@
         </div>
         <div id="revisor-container" class="space-y-4">
           <!-- Renderizado dinámico -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Explorador -->
+    <div id="tab-explorador" class="tab-content">
+      <div class="glass-card p-6 shadow-lg mb-8 flex flex-col h-[75vh]">
+        <div class="mb-4">
+          <h3 class="text-xl font-semibold text-gray-200">🔍 Explorador de Documentos</h3>
+          <p class="text-xs text-gray-400 mt-1">Busca y audita normativas de la base de datos sin salir del panel.</p>
+        </div>
+        
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
+          
+          <!-- Lista y Filtros (Izquierda) -->
+          <div class="col-span-1 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
+            <div class="p-3 border-b border-gray-700 bg-gray-800 flex flex-col gap-2">
+              <input type="text" id="exp-search" placeholder="Buscar en título..." class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 text-sm">
+              <div class="flex gap-2">
+                <select id="exp-categoria" class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white text-xs">
+                  <option value="">Todas las categorías</option>
+                </select>
+                <select id="exp-tipo" class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white text-xs">
+                  <option value="">Todos los tipos</option>
+                </select>
+              </div>
+            </div>
+            
+            <div id="exp-list" class="flex-1 overflow-y-auto p-0 custom-scrollbar">
+              <div class="p-4 text-center text-gray-500 text-sm">Cargando normativas...</div>
+            </div>
+            
+            <div class="p-2 border-t border-gray-700 bg-gray-800 flex justify-between items-center text-xs text-gray-400">
+              <button id="exp-prev" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">Anterior</button>
+              <span id="exp-page-info">Pág 1</span>
+              <button id="exp-next" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">Siguiente</button>
+            </div>
+          </div>
+          
+          <!-- Detalle (Derecha) -->
+          <div class="col-span-1 md:col-span-2 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
+            <div id="exp-detail-container" class="flex-1 overflow-y-auto p-6 custom-scrollbar text-sm text-gray-300">
+              <div class="flex h-full items-center justify-center text-gray-500 italic">
+                Selecciona una norma de la lista para ver sus detalles.
+              </div>
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>
@@ -821,6 +870,200 @@
         botMsgEl.innerHTML = `<span class="text-red-400 font-semibold">Error: No se pudo obtener respuesta del chatbot.</span>`;
       }
     });
+
+    // --- Lógica del Explorador de Documentos ---
+    let expCurrentPage = 1;
+    let expPageSize = 50;
+
+    async function initExplorador() {
+      // Cargar Metadatos
+      try {
+        const res = await fetch('/api/admin?action=normas-metadata', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const catSelect = document.getElementById('exp-categoria');
+          const tipoSelect = document.getElementById('exp-tipo');
+          
+          data.categorias.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c; opt.textContent = c;
+            if (c === 'Hacienda y Finanzas') opt.selected = true; // Default
+            catSelect.appendChild(opt);
+          });
+          
+          data.tipos.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t; opt.textContent = t;
+            tipoSelect.appendChild(opt);
+          });
+        }
+      } catch(e) { console.error("Error cargando metadatos", e); }
+
+      // Eventos de Filtros
+      document.getElementById('exp-search').addEventListener('input', debounce(loadNormasList, 500));
+      document.getElementById('exp-categoria').addEventListener('change', loadNormasList);
+      document.getElementById('exp-tipo').addEventListener('change', loadNormasList);
+      document.getElementById('exp-prev').addEventListener('click', () => { if (expCurrentPage > 1) { expCurrentPage--; loadNormasList(); } });
+      document.getElementById('exp-next').addEventListener('click', () => { expCurrentPage++; loadNormasList(); });
+
+      loadNormasList();
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    async function loadNormasList() {
+      const listContainer = document.getElementById('exp-list');
+      listContainer.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">Cargando normativas...</div>';
+      
+      const q = document.getElementById('exp-search').value.trim();
+      const cat = document.getElementById('exp-categoria').value;
+      const tipo = document.getElementById('exp-tipo').value;
+      
+      let url = `/api/admin?action=normas-list&page=${expCurrentPage}&pageSize=${expPageSize}`;
+      if (q) url += `&q=${encodeURIComponent(q)}`;
+      if (cat) url += `&categoria=${encodeURIComponent(cat)}`;
+      if (tipo) url += `&tipo=${encodeURIComponent(tipo)}`;
+
+      try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+        if (!res.ok) throw new Error("Error fetching list");
+        const data = await res.json();
+        
+        // Paginación UI
+        document.getElementById('exp-page-info').textContent = `Pág ${data.page}`;
+        document.getElementById('exp-prev').disabled = data.page <= 1;
+        document.getElementById('exp-next').disabled = data.normas.length < data.pageSize;
+
+        if (data.normas.length === 0) {
+          listContainer.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No se encontraron resultados.</div>';
+          return;
+        }
+
+        listContainer.innerHTML = data.normas.map(n => `
+          <div onclick="window.location.hash = '#/norma/${n.id}'" class="p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition">
+            <div class="font-semibold text-blue-400 text-sm mb-1">${n.tipo_nombre}</div>
+            <div class="text-xs text-gray-300 font-medium truncate mb-1" title="${n.titulo}">${n.titulo}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wide">${n.categoria_nombre || 'Sin Categoría'}</div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        listContainer.innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Error cargando lista.</div>';
+      }
+    }
+
+    async function loadNormaDetail(id) {
+      const container = document.getElementById('exp-detail-container');
+      container.innerHTML = '<div class="flex h-full items-center justify-center text-gray-500"><div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-600 h-8 w-8"></div></div>';
+      
+      try {
+        const res = await fetch(`/api/admin?action=norma-detail&id=${id}`, {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (!res.ok) throw new Error("Error fetching detail");
+        const norma = await res.json();
+
+        // Validar Hash
+        let hashWarning = '';
+        if (norma.resumen_ia && norma.resumen_ia_hash !== norma.computed_hash) {
+          hashWarning = `
+            <div class="bg-yellow-900/50 border border-yellow-700 text-yellow-400 p-3 rounded mb-4 text-xs flex items-start gap-2">
+              <span>⚠️</span>
+              <div>
+                <strong>Posible Desactualización:</strong> El resumen de IA se generó con una versión anterior del texto de esta norma.<br>
+                <span class="text-gray-500 text-[10px] mt-1 block">Hash actual: ${norma.computed_hash.substring(0,8)}... vs Hash Resumen: ${(norma.resumen_ia_hash || '').substring(0,8)}...</span>
+              </div>
+            </div>
+          `;
+        }
+
+        container.innerHTML = `
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h2 class="text-2xl font-bold text-white mb-1">${norma.tipo_nombre} N° ${norma.numero}</h2>
+              <span class="bg-gray-800 text-gray-400 text-xs px-2 py-1 rounded border border-gray-700">${norma.categoria_nombre || 'Sin categoría'}</span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="navigator.clipboard.writeText(document.getElementById('raw-text').textContent)" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition">
+                📋 Copiar Texto
+              </button>
+              <button onclick="document.getElementById('json-view').classList.toggle('hidden')" class="bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 px-3 py-1.5 rounded text-xs font-semibold transition">
+                { } Ver JSON
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 p-4 rounded border border-gray-700 mb-4">
+            <h4 class="text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Título Original</h4>
+            <p class="text-sm text-gray-200">${norma.titulo || '-'}</p>
+          </div>
+
+          ${hashWarning}
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-gray-800 p-4 rounded border border-gray-700 flex flex-col">
+              <h4 class="text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Resumen Humano</h4>
+              <p class="text-sm text-gray-300 flex-1 whitespace-pre-wrap">${norma.resumen || '<span class="text-gray-500 italic">Sin resumen</span>'}</p>
+            </div>
+            <div class="bg-blue-900/20 p-4 rounded border border-blue-800/50 flex flex-col">
+              <h4 class="text-xs font-bold text-blue-400 uppercase mb-2 tracking-wider">Resumen IA (Burocracio)</h4>
+              <p class="text-sm text-gray-300 flex-1 whitespace-pre-wrap">${norma.resumen_ia || '<span class="text-gray-500 italic">No generado aún</span>'}</p>
+            </div>
+          </div>
+
+          <details class="bg-gray-800 rounded border border-gray-700 mb-4">
+            <summary class="p-3 text-sm font-semibold text-gray-300 cursor-pointer hover:text-white transition outline-none">
+              Ver Texto Completo (${(norma.texto_completo || '').length} caracteres)
+            </summary>
+            <div class="p-4 border-t border-gray-700">
+              <pre id="raw-text" class="text-xs font-mono text-gray-400 whitespace-pre-wrap overflow-x-auto">${norma.texto_completo || 'Sin texto completo.'}</pre>
+            </div>
+          </details>
+
+          <div id="json-view" class="hidden bg-black p-4 rounded border border-gray-700 overflow-x-auto mt-4">
+            <pre class="text-xs font-mono text-green-400">${JSON.stringify(norma, null, 2)}</pre>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = '<div class="flex h-full items-center justify-center text-red-400">Error al cargar la norma.</div>';
+      }
+    }
+
+    // --- Routing por Hash ---
+    window.addEventListener('hashchange', () => {
+      if (!currentToken) return;
+      const hash = window.location.hash;
+      
+      if (hash.startsWith('#/norma/')) {
+        const id = hash.split('/')[2];
+        if (id) {
+          // Activar Pestaña Explorador
+          document.getElementById('btn-tab-explorador').click();
+          loadNormaDetail(id);
+        }
+      }
+    });
+
+    // Hook en el render de tabs
+    const originalSwitchTab = switchTab;
+    switchTab = function(e, tabId) {
+      originalSwitchTab(e, tabId);
+      if (tabId === 'tab-explorador' && !document.getElementById('exp-categoria').options.length > 1) {
+        initExplorador();
+      }
+      if (tabId !== 'tab-explorador') {
+        // Limpiar hash si salimos del explorador
+        history.pushState("", document.title, window.location.pathname + window.location.search);
+      }
+    };
 
   </script>
 </body>

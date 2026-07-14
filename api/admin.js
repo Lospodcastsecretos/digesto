@@ -336,6 +336,75 @@ export default async function handler(req, res) {
       return;
     }
 
+    // 6. EXPLORADOR DE DOCUMENTOS
+    if (action === 'normas-metadata') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      const categorias = await query("SELECT DISTINCT categoria_nombre FROM normas WHERE categoria_nombre IS NOT NULL ORDER BY categoria_nombre");
+      const tipos = await query("SELECT DISTINCT tipo_nombre FROM normas WHERE tipo_nombre IS NOT NULL ORDER BY tipo_nombre");
+      res.status(200).json({ 
+        categorias: categorias.map(c => c.categoria_nombre), 
+        tipos: tipos.map(t => t.tipo_nombre) 
+      });
+      return;
+    }
+
+    if (action === 'normas-list') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      const page = parseInt(req.query.page) || 1;
+      const pageSize = parseInt(req.query.pageSize) || 50;
+      const offset = (page - 1) * pageSize;
+      const { categoria, tipo, q } = req.query;
+
+      let sql = "SELECT id, titulo, tipo_nombre, categoria_nombre FROM normas WHERE 1=1";
+      const args = [];
+
+      if (categoria) {
+        sql += " AND categoria_nombre = ?";
+        args.push(categoria);
+      }
+      if (tipo) {
+        sql += " AND tipo_nombre = ?";
+        args.push(tipo);
+      }
+      if (q) {
+        sql += " AND titulo LIKE ?";
+        args.push(`%${q}%`);
+      }
+
+      sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
+      args.push(pageSize, offset);
+
+      const rows = await query(sql, args);
+      
+      // Get total count for pagination
+      let countSql = "SELECT COUNT(*) as total FROM normas WHERE 1=1";
+      const countArgs = [];
+      if (categoria) { countSql += " AND categoria_nombre = ?"; countArgs.push(categoria); }
+      if (tipo) { countSql += " AND tipo_nombre = ?"; countArgs.push(tipo); }
+      if (q) { countSql += " AND titulo LIKE ?"; countArgs.push(`%${q}%`); }
+      const countResult = await query(countSql, countArgs);
+      const total = countResult[0]?.total || 0;
+
+      res.status(200).json({ normas: rows, total, page, pageSize });
+      return;
+    }
+
+    if (action === 'norma-detail') {
+      if (req.method !== 'GET') return res.status(405).json({ error: "Method not allowed" });
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: "Falta el parámetro id" });
+
+      const rows = await query("SELECT id, numero, titulo, tipo_nombre, categoria_nombre, resumen, texto_completo, resumen_ia, resumen_ia_hash FROM normas WHERE id = ?", [parseInt(id)]);
+      if (rows.length === 0) return res.status(404).json({ error: "Norma no encontrada." });
+
+      const norma = rows[0];
+      const textToSummarize = norma.texto_completo || norma.resumen || norma.titulo || "Sin texto disponible.";
+      const computed_hash = crypto.createHash('md5').update(textToSummarize).digest('hex');
+
+      res.status(200).json({ ...norma, computed_hash });
+      return;
+    }
+
     res.status(400).json({ error: "Acción no reconocida." });
 
   } catch (err) {
