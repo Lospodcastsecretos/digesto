@@ -265,40 +265,60 @@
         <div class="mb-4">
           <h3 class="text-xl font-semibold text-gray-200">🔍 Explorador de Documentos</h3>
           <p class="text-xs text-gray-400 mt-1">Busca y audita normativas de la base de datos sin salir del panel.</p>
-        </div>
-        
-        <div class="flex-1 grid grid-cols-1 md:grid-cols-5 gap-6 overflow-hidden">
+        <!-- Barra de Direcciones / Address Bar -->
+        <div class="flex items-center gap-2 mb-4 bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300">
+          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+          <span class="font-semibold text-blue-400 cursor-pointer hover:underline" onclick="resetExplorer()">Este Equipo</span> <span class="text-gray-500">&gt;</span> 
+          <span class="font-semibold text-blue-400 cursor-pointer hover:underline" onclick="resetExplorer()">Digesto</span> <span class="text-gray-500">&gt;</span> 
+          <span id="exp-breadcrumb" class="text-gray-100">Búsqueda General</span>
           
-          <!-- Lista y Filtros (Izquierda) -->
+          <div class="ml-auto flex items-center gap-2 relative">
+             <svg class="w-4 h-4 absolute left-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+             <input type="text" id="exp-search" placeholder="Buscar en carpeta actual..." class="w-64 py-1 pl-8 pr-2 rounded bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-blue-500 text-sm">
+          </div>
+        </div>
+
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 overflow-hidden">
+          
+          <!-- Panel de Navegación (Izquierda) -->
+          <div class="col-span-1 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden text-sm">
+            <div class="p-2 border-b border-gray-700 bg-gray-800 font-semibold text-gray-300 text-xs uppercase tracking-wider">
+              Carpetas
+            </div>
+            <div id="exp-tree" class="flex-1 overflow-y-auto p-2 custom-scrollbar text-gray-300">
+              <div class="text-center text-gray-500 mt-4 text-xs">Cargando árbol...</div>
+            </div>
+          </div>
+          
+          <!-- Lista de Archivos (Centro) -->
           <div class="col-span-1 md:col-span-2 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
-            <div class="p-3 border-b border-gray-700 bg-gray-800 flex flex-col gap-2">
-              <input type="text" id="exp-search" placeholder="Buscar en título..." class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 text-sm">
-              <div class="flex gap-2">
-                <select id="exp-categoria" class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white text-xs">
-                  <option value="">Todas las categorías</option>
-                </select>
-                <select id="exp-tipo" class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white text-xs">
-                  <option value="">Todos los tipos</option>
-                </select>
-              </div>
+            <!-- Table Header -->
+            <div class="border-b border-gray-700 bg-gray-800 flex text-gray-400 font-semibold text-xs tracking-wide">
+              <div class="p-2 w-7/12 border-r border-gray-700">Nombre</div>
+              <div class="p-2 w-3/12 border-r border-gray-700">Tipo</div>
+              <div class="p-2 w-2/12 text-right">N°</div>
             </div>
             
-            <div id="exp-list" class="flex-1 overflow-y-auto p-0 custom-scrollbar">
+            <div id="exp-list" class="flex-1 overflow-y-auto p-0 custom-scrollbar select-none">
               <div class="p-4 text-center text-gray-500 text-sm">Cargando normativas...</div>
             </div>
             
             <div class="p-2 border-t border-gray-700 bg-gray-800 flex justify-between items-center text-xs text-gray-400">
-              <button id="exp-prev" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">Anterior</button>
+              <button id="exp-prev" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 transition">Anterior</button>
               <span id="exp-page-info">Pág 1</span>
-              <button id="exp-next" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">Siguiente</button>
+              <button id="exp-next" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 transition">Siguiente</button>
             </div>
           </div>
           
-          <!-- Detalle (Derecha) -->
-          <div class="col-span-1 md:col-span-3 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
-            <div id="exp-detail-container" class="flex-1 overflow-y-auto p-6 custom-scrollbar text-sm text-gray-300">
-              <div class="flex h-full items-center justify-center text-gray-500 italic">
-                Selecciona una norma de la lista para ver sus detalles.
+          <!-- Panel de Vista Previa (Derecha) -->
+          <div class="col-span-1 md:col-span-2 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
+            <div class="p-2 border-b border-gray-700 bg-gray-800 font-semibold text-gray-300 text-xs uppercase tracking-wider">
+              Vista Previa
+            </div>
+            <div id="exp-detail-container" class="flex-1 overflow-y-auto p-6 custom-scrollbar text-sm text-gray-300 relative">
+              <div class="flex h-full flex-col items-center justify-center text-gray-500 italic">
+                <svg class="w-16 h-16 mb-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Selecciona un archivo para ver la vista previa.
               </div>
             </div>
           </div>
@@ -875,41 +895,85 @@
     // --- Lógica del Explorador de Documentos ---
     let expCurrentPage = 1;
     let expPageSize = 50;
+    let expCurrentCat = '';
+    let expCurrentTipo = '';
 
     async function initExplorador() {
-      // Cargar Metadatos
+      const treeContainer = document.getElementById('exp-tree');
       try {
         const res = await fetch('/api/admin?action=normas-metadata', {
           headers: { 'Authorization': `Bearer ${currentToken}` }
         });
         if (res.ok) {
           const data = await res.json();
-          const catSelect = document.getElementById('exp-categoria');
-          const tipoSelect = document.getElementById('exp-tipo');
+          let treeHTML = '';
           
-          data.categorias.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c; opt.textContent = c;
-            if (c === 'Hacienda y Finanzas') opt.selected = true; // Default
-            catSelect.appendChild(opt);
-          });
-          
-          data.tipos.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t; opt.textContent = t;
-            tipoSelect.appendChild(opt);
-          });
-        }
-      } catch(e) { console.error("Error cargando metadatos", e); }
+          // Todo Item
+          treeHTML += `
+            <div class="cursor-pointer py-1 px-2 hover:bg-gray-800 rounded transition tree-item active flex items-center gap-2" data-cat="" data-tipo="" onclick="selectFolder('', '')">
+              <span class="text-blue-400">📁</span> Todas las normativas
+            </div>
+          `;
 
-      // Eventos de Filtros
-      document.getElementById('exp-search').addEventListener('input', debounce(loadNormasList, 500));
-      document.getElementById('exp-categoria').addEventListener('change', loadNormasList);
-      document.getElementById('exp-tipo').addEventListener('change', loadNormasList);
+          data.categorias.forEach(c => {
+            if(!c) return;
+            treeHTML += `
+              <div class="mt-2">
+                <div class="cursor-pointer py-1 px-2 hover:bg-gray-800 rounded transition tree-item flex items-center gap-2 font-semibold text-gray-200" data-cat="${c}" data-tipo="" onclick="selectFolder('${c}', '')">
+                  <span class="text-yellow-500">📁</span> ${c}
+                </div>
+                <div class="ml-4 pl-2 border-l border-gray-700 space-y-1 mt-1">
+            `;
+            data.tipos.forEach(t => {
+              treeHTML += `
+                  <div class="cursor-pointer py-1 px-2 hover:bg-gray-800 rounded transition tree-item flex items-center gap-2 text-xs" data-cat="${c}" data-tipo="${t}" onclick="selectFolder('${c}', '${t}')">
+                    <span class="text-blue-300">📄</span> ${t}
+                  </div>
+              `;
+            });
+            treeHTML += `
+                </div>
+              </div>
+            `;
+          });
+          
+          treeContainer.innerHTML = treeHTML;
+        }
+      } catch(e) { 
+        treeContainer.innerHTML = '<div class="text-red-400 text-xs">Error cargando árbol</div>';
+      }
+
+      // Eventos
+      document.getElementById('exp-search').addEventListener('input', debounce(() => { expCurrentPage = 1; loadNormasList(); }, 500));
       document.getElementById('exp-prev').addEventListener('click', () => { if (expCurrentPage > 1) { expCurrentPage--; loadNormasList(); } });
       document.getElementById('exp-next').addEventListener('click', () => { expCurrentPage++; loadNormasList(); });
 
+      // Cargar la vista predeterminada
+      selectFolder('Hacienda y Finanzas', '');
+    }
+
+    function selectFolder(cat, tipo) {
+      expCurrentCat = cat;
+      expCurrentTipo = tipo;
+      expCurrentPage = 1;
+      
+      // Actualizar Breadcrumb
+      let breadcrumb = '';
+      if (cat && tipo) breadcrumb = `${cat} > ${tipo}`;
+      else if (cat) breadcrumb = cat;
+      else breadcrumb = 'Todas las normativas';
+      document.getElementById('exp-breadcrumb').textContent = breadcrumb;
+
+      // Actualizar visual del Tree
+      document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('bg-blue-900/50', 'border-blue-500', 'border-l-2'));
+      const activeItem = document.querySelector(`.tree-item[data-cat="${cat}"][data-tipo="${tipo}"]`);
+      if(activeItem) activeItem.classList.add('bg-blue-900/50', 'border-blue-500', 'border-l-2');
+
       loadNormasList();
+    }
+
+    function resetExplorer() {
+      selectFolder('', '');
     }
 
     function debounce(func, wait) {
@@ -925,13 +989,11 @@
       listContainer.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">Cargando normativas...</div>';
       
       const q = document.getElementById('exp-search').value.trim();
-      const cat = document.getElementById('exp-categoria').value;
-      const tipo = document.getElementById('exp-tipo').value;
       
       let url = `/api/admin?action=normas-list&page=${expCurrentPage}&pageSize=${expPageSize}`;
       if (q) url += `&q=${encodeURIComponent(q)}`;
-      if (cat) url += `&categoria=${encodeURIComponent(cat)}`;
-      if (tipo) url += `&tipo=${encodeURIComponent(tipo)}`;
+      if (expCurrentCat) url += `&categoria=${encodeURIComponent(expCurrentCat)}`;
+      if (expCurrentTipo) url += `&tipo=${encodeURIComponent(expCurrentTipo)}`;
 
       try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
@@ -944,15 +1006,17 @@
         document.getElementById('exp-next').disabled = data.normas.length < data.pageSize;
 
         if (data.normas.length === 0) {
-          listContainer.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No se encontraron resultados.</div>';
+          listContainer.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">Esta carpeta está vacía.</div>';
           return;
         }
 
         listContainer.innerHTML = data.normas.map(n => `
-          <div onclick="window.location.hash = '#/norma/${n.id}'" class="p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition">
-            <div class="font-semibold text-blue-400 text-sm mb-1">${n.tipo_nombre} N° ${n.numero || '-'}</div>
-            <div class="text-xs text-gray-300 font-medium truncate mb-1" title="${n.titulo}">${n.titulo}</div>
-            <div class="text-[10px] text-gray-500 uppercase tracking-wide">${n.categoria_nombre || 'Sin Categoría'}</div>
+          <div onclick="window.location.hash = '#/norma/${n.id}'" class="flex border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition text-gray-300">
+            <div class="p-2 w-7/12 border-r border-gray-800 truncate" title="${n.titulo}">
+              <span class="mr-2 text-blue-400">📄</span> ${n.titulo || 'Sin título'}
+            </div>
+            <div class="p-2 w-3/12 border-r border-gray-800 truncate text-xs flex items-center">${n.tipo_nombre}</div>
+            <div class="p-2 w-2/12 text-right text-xs text-gray-400 flex items-center justify-end">${n.numero || '-'}</div>
           </div>
         `).join('');
 
@@ -1054,11 +1118,13 @@
     });
 
     // Hook en el render de tabs
+    let exploradorInitialized = false;
     const originalSwitchTab = switchTab;
     switchTab = function(e, tabId) {
       originalSwitchTab(e, tabId);
-      if (tabId === 'tab-explorador' && document.getElementById('exp-categoria').options.length <= 1) {
+      if (tabId === 'tab-explorador' && !exploradorInitialized) {
         initExplorador();
+        exploradorInitialized = true;
       }
       if (tabId !== 'tab-explorador') {
         // Limpiar hash si salimos del explorador
