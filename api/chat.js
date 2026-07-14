@@ -204,8 +204,18 @@ export default async function handler(req, res) {
           }
         }
 
-        // 2.2 Obtener candidatos de FTS5
-        const candidates = await tursoQuery("SELECT id FROM normas_fts WHERE normas_fts MATCH ? LIMIT 100", [keywords]);
+        // 2.2 Obtener candidatos de FTS5 (priorizando si el usuario mencionó un número de norma explícito)
+        const possibleNumbers = message.match(/\b\d{1,6}\b/g) || [];
+        const firstNum = possibleNumbers.length > 0 ? possibleNumbers[0] : "";
+        
+        const candidateSql = `
+          SELECT id FROM (
+            SELECT id, 10 AS p FROM normas WHERE numero = ? AND ? != ''
+            UNION ALL
+            SELECT id, 1 AS p FROM normas_fts WHERE normas_fts MATCH ?
+          ) GROUP BY id ORDER BY MAX(p) DESC LIMIT 150
+        `;
+        const candidates = await tursoQuery(candidateSql, [firstNum, firstNum, keywords]);
         candidateIds = candidates.map(c => parseInt(c.id)).filter(id => !isNaN(id));
 
         let normasRows = [];
