@@ -355,7 +355,7 @@ export default async function handler(req, res) {
       const offset = (page - 1) * pageSize;
       const { categoria, tipo, q } = req.query;
 
-      let sql = "SELECT id, titulo, tipo_nombre, categoria_nombre FROM normas WHERE 1=1";
+      let sql = "SELECT id, numero, titulo, tipo_nombre, categoria_nombre FROM normas WHERE 1=1";
       const args = [];
 
       if (categoria) {

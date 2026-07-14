@@ -268,10 +268,10 @@
           <p class="text-xs text-gray-400 mt-1">Busca y audita normativas de la base de datos sin salir del panel.</p>
         </div>
         
-        <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-5 gap-6 overflow-hidden">
           
           <!-- Lista y Filtros (Izquierda) -->
-          <div class="col-span-1 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
+          <div class="col-span-1 md:col-span-2 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
             <div class="p-3 border-b border-gray-700 bg-gray-800 flex flex-col gap-2">
               <input type="text" id="exp-search" placeholder="Buscar en título..." class="w-full p-2 rounded bg-gray-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 text-sm">
               <div class="flex gap-2">
@@ -296,7 +296,7 @@
           </div>
           
           <!-- Detalle (Derecha) -->
-          <div class="col-span-1 md:col-span-2 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
+          <div class="col-span-1 md:col-span-3 flex flex-col bg-gray-900 rounded border border-gray-700 overflow-hidden">
             <div id="exp-detail-container" class="flex-1 overflow-y-auto p-6 custom-scrollbar text-sm text-gray-300">
               <div class="flex h-full items-center justify-center text-gray-500 italic">
                 Selecciona una norma de la lista para ver sus detalles.
@@ -951,7 +951,7 @@
 
         listContainer.innerHTML = data.normas.map(n => `
           <div onclick="window.location.hash = '#/norma/${n.id}'" class="p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition">
-            <div class="font-semibold text-blue-400 text-sm mb-1">${n.tipo_nombre}</div>
+            <div class="font-semibold text-blue-400 text-sm mb-1">${n.tipo_nombre} N° ${n.numero || '-'}</div>
             <div class="text-xs text-gray-300 font-medium truncate mb-1" title="${n.titulo}">${n.titulo}</div>
             <div class="text-[10px] text-gray-500 uppercase tracking-wide">${n.categoria_nombre || 'Sin Categoría'}</div>
           </div>
