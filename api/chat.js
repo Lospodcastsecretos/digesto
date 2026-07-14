@@ -225,21 +225,24 @@ export default async function handler(req, res) {
           const placeholders = candidateIds.map(() => '?').join(',');
           const searchSql = `
             SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente,
-                   (1.0 - vector_distance_cos(embedding, ?)) AS vector_score
+                   (1.0 - vector_distance_cos(embedding, ?)) AS vector_score,
+                   (CASE WHEN numero = ? AND ? != '' THEN 100.0 WHEN numero LIKE ? AND ? != '' THEN 50.0 ELSE 0.0 END) AS exact_num_score
             FROM normas
             WHERE id IN (${placeholders})
-            ORDER BY vector_score DESC LIMIT 5
+            ORDER BY (exact_num_score + vector_score * 0.4) DESC LIMIT 5
           `;
-          normasRows = await tursoQuery(searchSql, [queryVectorBlob, ...candidateIds]);
+          normasRows = await tursoQuery(searchSql, [queryVectorBlob, firstNum, firstNum, `%${firstNum}%`, firstNum, ...candidateIds]);
         } else if (candidateIds.length > 0) {
           // Fallback a sintáctico FTS5 tradicional
           const placeholders = candidateIds.map(() => '?').join(',');
           const searchSql = `
-            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente
+            SELECT id, numero, titulo, resumen, tipo_nombre, fecha, texto_completo, vigente,
+                   (CASE WHEN numero = ? AND ? != '' THEN 100.0 WHEN numero LIKE ? AND ? != '' THEN 50.0 ELSE 0.0 END) AS exact_num_score
             FROM normas
-            WHERE id IN (${placeholders}) LIMIT 5
+            WHERE id IN (${placeholders})
+            ORDER BY exact_num_score DESC LIMIT 5
           `;
-          normasRows = await tursoQuery(searchSql, candidateIds);
+          normasRows = await tursoQuery(searchSql, [firstNum, firstNum, `%${firstNum}%`, firstNum, ...candidateIds]);
         }
 
         finalNormsRows = normasRows;
