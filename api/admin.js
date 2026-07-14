@@ -367,8 +367,8 @@ export default async function handler(req, res) {
         args.push(tipo);
       }
       if (q) {
-        sql += " AND titulo LIKE ?";
-        args.push(`%${q}%`);
+        sql += " AND (titulo LIKE ? OR numero = ? OR numero LIKE ?)";
+        args.push(`%${q}%`, q, `%${q}%`);
       }
 
       sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
@@ -381,7 +381,10 @@ export default async function handler(req, res) {
       const countArgs = [];
       if (categoria) { countSql += " AND categoria_nombre = ?"; countArgs.push(categoria); }
       if (tipo) { countSql += " AND tipo_nombre = ?"; countArgs.push(tipo); }
-      if (q) { countSql += " AND titulo LIKE ?"; countArgs.push(`%${q}%`); }
+      if (q) { 
+        countSql += " AND (titulo LIKE ? OR numero = ? OR numero LIKE ?)"; 
+        countArgs.push(`%${q}%`, q, `%${q}%`); 
+      }
       const countResult = await query(countSql, countArgs);
       const total = countResult[0]?.total || 0;
 
